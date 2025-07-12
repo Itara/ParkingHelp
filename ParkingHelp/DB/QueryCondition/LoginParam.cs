@@ -3,6 +3,6 @@
     public class LoginParam
     {
         /// <summary>Login ID</summary>
-        public string MemberId { get; set; }
+        public string? MemberId { get; set; }
     }
 }
