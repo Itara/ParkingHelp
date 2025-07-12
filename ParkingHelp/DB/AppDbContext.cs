@@ -3,7 +3,7 @@ using ParkingHelp.Models;
 
 namespace ParkingHelp.DB
 {
-    public class AppDbContext :DbContext
+    public class AppDbContext : DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
         public DbSet<Member> Members { get; set; }
@@ -13,7 +13,7 @@ namespace ParkingHelp.DB
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // 테이블명 설정 (대소문자 구분 방지)
-            modelBuilder.Entity<Member>().ToTable("member").Property(m => m.CreateDate).ValueGeneratedOnAdd(); 
+            modelBuilder.Entity<Member>().ToTable("member").Property(m => m.CreateDate).ValueGeneratedOnAdd();
             modelBuilder.Entity<MemberCar>().ToTable("member_car");
             modelBuilder.Entity<ReqHelp>().ToTable("req_help");
             modelBuilder.Entity<HelpOffer>().ToTable("helpoffer");
@@ -66,6 +66,12 @@ namespace ParkingHelp.DB
                 .WithMany()
                 .HasForeignKey(h => h.ReqMemId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<HelpOffer>()
+             .HasOne(h => h.ReserveCar)
+            .WithMany()
+            .HasForeignKey(h => h.ReserveCarId)
+            .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

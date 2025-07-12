@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace ParkingHelp.Models
 {
@@ -23,7 +24,9 @@ namespace ParkingHelp.Models
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
         public ICollection<MemberCar> Cars { get; set; } = new List<MemberCar>();
+        [JsonIgnore]
         public ICollection<ReqHelp> HelpRequests { get; set; } = new List<ReqHelp>();
+        [JsonIgnore]
         public ICollection<HelpOffer> HelpOffers { get; set; } = new List<HelpOffer>();
     }
 }

@@ -77,7 +77,7 @@ namespace ParkingHelp.Controllers
                     CreateDate = DateTime.UtcNow,
                     UpdateDate = DateTime.UtcNow
                 };
-                _context.MemberCars.Add(newCar);
+                await _context.MemberCars.AddAsync(newCar);
                 await _context.SaveChangesAsync();
                 return Ok(newMember);
             }

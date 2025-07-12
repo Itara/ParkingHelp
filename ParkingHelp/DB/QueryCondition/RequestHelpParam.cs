@@ -10,17 +10,17 @@ namespace ParkingHelp.DB.QueryCondition
     public class RequestHelpGetParam
     {
         /// <summary>도움 요청자 ID</summary>
-       // [SwaggerSchema("도움 요청자 고유Id", Format = "int")]
+        [SwaggerSchema("도움 요청자 고유Id", Format = "int")]
         [DefaultValue(1)]
         public int? HelpReqMemId { get; set; }
 
         /// <summary>도움을 제공한 사용자 ID</summary>
-        //[SwaggerSchema("주차 등록해줄사람 고유Id", Format = "int")]
+        [SwaggerSchema("주차 등록해줄사람 고유Id", Format = "int")]
         [DefaultValue(1)]
         public int? HelperMemId { get; set; }
 
         /// <summary>요청 차량 ID</summary>
-        //[SwaggerSchema("차량번호", Format = "string")]
+        [SwaggerSchema("차량번호", Format = "string")]
         [DefaultValue("10저3519")]
         public string? ReqCarNumber { get; set; }
 

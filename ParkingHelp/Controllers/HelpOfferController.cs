@@ -1,46 +1,44 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.Models;
-using System.Linq;
+
 namespace ParkingHelp.Controllers
 {
-    
     [Route("api/[controller]")]
     [ApiController]
-    public class ParkingHelperController : ControllerBase
+    public class HelpOfferController : ControllerBase
     {
         private readonly AppDbContext _context;
 
-        public ParkingHelperController(AppDbContext context)
+        public HelpOfferController(AppDbContext context)
         {
             _context = context;
         }
 
         /// <summary>
-        /// 주차등록 요청 조회
+        /// 도와줄수있는 리스트 
         /// </summary>
         /// <param name="query"></param>
         /// <returns></returns>
-        [HttpGet("RequestHelp")]
-        public async Task<IActionResult> GetRequestHelp([FromQuery] RequestHelpGetParam query)
+        [HttpGet()]
+        public async Task<IActionResult> GetHelpOfferList([FromQuery] RequestHelpGetParam query)
         {
             try
             {
-                DateTime nowKST = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul"));
+                DateTime nowKST = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul"));
                 DateTime startOfToday = nowKST.Date; //
                 DateTime endOfToday = startOfToday.AddDays(1).AddSeconds(-1);
-                
+
                 DateTime fromDate = query.FromReqDate ?? startOfToday;
                 DateTime toDate = query.ToReqDate ?? endOfToday;
                 var reqHelps = await _context.ReqHelps
                     .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate)
                     .OrderBy(x => x.ReqDate).ToListAsync();
-                
+
                 return Ok(reqHelps);
             }
             catch (Exception ex)
@@ -54,22 +52,18 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpPost("RequestHelp")]
+        [HttpPost("HelpOffer")]
         public async Task<IActionResult> PostRequestHelp([FromBody] RequestHelpPostParam query)
         {
             try
             {
-                var newReqHelp = new ReqHelp
+                var newHelpOffer = new HelpOffer
                 {
-                    HelpReqMemId = query.HelpReqMemId ?? 0,
-                    Status = 0,
-                    ReqCarId = query.CarId,
-                    carNumber = query.CarNumber ?? string.Empty,
-                    ReqDate = DateTime.UtcNow
+                 
                 };
-                _context.ReqHelps.Add(newReqHelp);
+                _context.HelpOffers.Add(newHelpOffer);
                 await _context.SaveChangesAsync();
-                return Ok(newReqHelp);
+                return Ok(newHelpOffer);
             }
             catch (Exception ex)
             {
@@ -78,21 +72,19 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpPut("RequestHelp/{id}")]
-        public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpPutParam query)
+        [HttpPut("HelpOffer/{id}")]
+        public async Task<IActionResult> PutHelpOffer(int id, [FromBody] RequestHelpPutParam query)
         {
-            var reqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == id);
+            var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
 
             if (reqHelp == null)
             {
-                return NotFound("요청이 존재하지 않습니다.");
+                return NotFound("?? 존재하지 않습니다.");
             }
 
             try
             {
-                reqHelp.Status = query.Status ?? reqHelp.Status;
-                reqHelp.HelperMemId = query.HelperMemId ?? reqHelp.HelperMemId;
-                reqHelp.HelpDate = query.HelpDate ?? reqHelp.HelpDate;
+              
                 await _context.SaveChangesAsync();
                 return Ok(reqHelp);
             }
@@ -102,10 +94,10 @@ namespace ParkingHelp.Controllers
                 return BadRequest(jResult.ToString());
             }
         }
-        [HttpDelete("RequestHelp/{id}")]
+        [HttpDelete("HelpOffer/{id}")]
         public async Task<IActionResult> DeleteRequestHelp(int id)
         {
-            var reqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == id);
+            var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
 
             if (reqHelp == null)
             {
@@ -114,9 +106,9 @@ namespace ParkingHelp.Controllers
 
             try
             {
-                _context.ReqHelps.Remove(reqHelp);
+                _context.HelpOffers.Remove(reqHelp);
                 await _context.SaveChangesAsync();
-                return Ok(reqHelp);
+                return Ok();
             }
             catch (Exception ex)
             {

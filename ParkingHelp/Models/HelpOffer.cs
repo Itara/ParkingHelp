@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace ParkingHelp.Models
 {
@@ -12,8 +13,10 @@ namespace ParkingHelp.Models
         public DateTime InsertDate { get; set; }
         public int ReqMemId { get; set; }
         public DateTime ReqDate { get; set; }
+        public int? ReserveCarId { get; set; }
 
         public Member Helper { get; set; } = null!;
         public Member Requester { get; set; } = null!;
+        public MemberCar ReserveCar { get; set; } = null!;
     }
 }
