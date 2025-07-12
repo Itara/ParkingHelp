@@ -66,7 +66,6 @@ namespace ParkingHelp.Controllers
                 var newMember = new Member
                 {
                     MemberLoginId = query.memberLoginId,
-                    Password = query.password,
                     MemberName = query.memberName
                 };
                 _context.Members.Add(newMember);

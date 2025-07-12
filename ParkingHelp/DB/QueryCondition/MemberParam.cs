@@ -3,7 +3,6 @@
     public class MemberAddParam
     {
         public string memberLoginId { get; set; } = string.Empty; // 회원 ID
-        public string password { get; set; } = string.Empty; // 회원 비번
         public string memberName { get; set; } = string.Empty; // 회원명
         public string carNumber { get; set; } = string.Empty; // 차량 번호
     }
