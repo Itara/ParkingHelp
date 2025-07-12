@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.Models;
+using System.Linq;
 namespace ParkingHelp.Controllers
 {
     
@@ -20,13 +21,22 @@ namespace ParkingHelp.Controllers
             _context = context;
         }
 
+        /// <summary>
+        /// 주차등록 요청 조회
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
         [HttpGet("RequestHelp")]
         public async Task<IActionResult> GetRequestHelp([FromQuery] RequestHelpGetParam query)
         {
             try
             {
-                DateTime fromDate = query.FromReqDate ?? DateTime.MinValue;
-                DateTime toDate = query.ToReqDate ?? DateTime.MaxValue;
+                DateTime nowKST = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul"));
+                DateTime startOfToday = nowKST.Date; //
+                DateTime endOfToday = startOfToday.AddDays(1).AddSeconds(-1);
+                
+                DateTime fromDate = query.FromReqDate ?? startOfToday;
+                DateTime toDate = query.ToReqDate ?? endOfToday;
                 var reqHelps = await _context.ReqHelps
                     .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate)
                     .OrderBy(x => x.ReqDate).ToListAsync();
@@ -49,10 +59,11 @@ namespace ParkingHelp.Controllers
         {
             try
             {
-               var newReqHelp = new ReqHelp
+                var newReqHelp = new ReqHelp
                 {
                     HelpReqMemId = query.HelpReqMemId ?? 0,
-                    Status = query.Status ?? 0,
+                    Status = 0,
+                    ReqCarId = query.CarId,
                     carNumber = query.CarNumber ?? string.Empty,
                     ReqDate = DateTime.UtcNow
                 };
