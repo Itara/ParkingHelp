@@ -16,6 +16,8 @@ namespace ParkingHelp.Models
         public string Password { get; set; } = string.Empty;
         [Column("member_name")]
         public string MemberName { get; set; } = string.Empty;
+        [Column("email")]
+        public string Email { get; set; } = string.Empty;
         [Column("create_date")]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]  
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
