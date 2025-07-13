@@ -13,8 +13,8 @@ namespace ParkingHelp.Models
         public int Id { get; set; }
         [Column("member_login_id")]
         public string MemberLoginId { get; set; } = string.Empty;
-        [Column("password")]
-        public string Password { get; set; } = string.Empty;
+        //[Column("password")]
+        //public string Password { get; set; } = string.Empty;
         [Column("member_name")]
         public string MemberName { get; set; } = string.Empty;
         [Column("email")]
