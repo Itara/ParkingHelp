@@ -38,6 +38,7 @@ namespace ParkingHelp.Controllers
                 DateTime fromDate = query.FromReqDate ?? startOfToday;
                 DateTime toDate = query.ToReqDate ?? endOfToday;
                 var reqHelps = await _context.ReqHelps
+                    .Include(x => x.HelpRequester.HelpRequests)
                     .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate)
                     .OrderBy(x => x.ReqDate).ToListAsync();
                 
