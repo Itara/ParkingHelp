@@ -106,7 +106,7 @@ namespace ParkingHelp.Controllers
                 };
                 return BadRequest(returnJob.ToString());
             }
-            member.Password = query.password ?? member.Password;
+            //member.Password = query.password ?? member.Password;
             member.MemberName = query.memberName ?? member.MemberName;
             _context.Entry(member).Property(m => m.CreateDate).IsModified = false;
             _context.Members.Update(member);
