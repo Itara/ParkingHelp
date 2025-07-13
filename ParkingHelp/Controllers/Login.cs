@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
@@ -21,7 +22,7 @@ namespace ParkingHelp.Controllers
         [HttpPost()]
         public IActionResult LoginUser([FromBody] LoginParam query)
         {
-            var member = _context.Members.FirstOrDefault(x => x.MemberLoginId == query.MemberId);
+            var member = _context.Members.Include(m => m.Cars).FirstOrDefault(x => x.MemberLoginId == query.MemberLoginId);
             if (member == null)
             {
                 JObject result = new JObject
@@ -33,9 +34,7 @@ namespace ParkingHelp.Controllers
             }
             else
             {
-                JObject loginUser = JObject.FromObject(member);
-                loginUser.Add("Result", "Success");
-                return Ok(loginUser.ToString());
+                return Ok(member);
             }
         }
     }
