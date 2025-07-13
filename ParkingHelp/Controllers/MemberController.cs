@@ -66,7 +66,8 @@ namespace ParkingHelp.Controllers
                 var newMember = new Member
                 {
                     MemberLoginId = query.memberLoginId,
-                    MemberName = query.memberName
+                    MemberName = query.memberName,
+                    Email = query.email
                 };
                 _context.Members.Add(newMember);
                 await _context.SaveChangesAsync();

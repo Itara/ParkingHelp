@@ -15,6 +15,10 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("사용자 차량번호", Format = "string")]
         [DefaultValue("10저3519")]
         public string carNumber { get; set; } = string.Empty; // 차량 번호
+
+        [SwaggerSchema("사용자 이메일", Format = "string")]
+        [DefaultValue("abcd@pharmsoft.co.kr")]
+        public string email { get; set; } = string.Empty; // 차량 번호
     }
 
     public class MemberGetParam
