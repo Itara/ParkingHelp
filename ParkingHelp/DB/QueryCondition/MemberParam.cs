@@ -1,4 +1,5 @@
 ﻿//using Swashbuckle.AspNetCore.Annotations;
+using ParkingHelp.Models;
 using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel;
 
@@ -28,6 +29,8 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("사용자 차량번호", Format = "string")]
         [DefaultValue("10저3519")]
         public string carNumber { get; set; } = string.Empty; // 차량 번호
+
+        public CarHelpStatus? Status { get; set; } // 차량 번호
     }
 
     public class MemberUpdateParam

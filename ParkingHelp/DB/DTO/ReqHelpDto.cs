@@ -1,4 +1,6 @@
-﻿namespace ParkingHelp.DB.DTO
+﻿using ParkingHelp.Models;
+
+namespace ParkingHelp.DB.DTO
 {
     public class HelpRequesterDto
     {
@@ -26,6 +28,7 @@
         public HelpRequesterDto HelpRequester { get; set; } = null!;
         public HelperDto? Helper { get; set; }
         public ReqHelpCarDto? ReqCar { get; set; } = null!;
+        public CarHelpStatus? Status { get; set; }
     }
 
 }

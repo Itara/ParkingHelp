@@ -47,6 +47,7 @@ namespace ParkingHelp.Controllers
                          Id = r.Id,
                          ReqDate = r.ReqDate,
                          HelpDate = r.HelpDate,
+                         Status = r.Status,
                          HelpRequester = new HelpRequesterDto
                          {
                              Id = r.HelpRequester.Id,
