@@ -97,7 +97,7 @@ namespace ParkingHelp.Controllers
         public async Task<IActionResult> UpdateMember(int id, [FromBody] MemberUpdateParam query)
         {
             JObject returnJob = new JObject();
-            var member = await _context.Members.FindAsync(id);
+            var member = await _context.Members.Include(m => m.Cars).FirstOrDefaultAsync(m => m.Id == id);
             if (member == null)
             {
                 returnJob = new JObject
@@ -107,10 +107,15 @@ namespace ParkingHelp.Controllers
                 };
                 return BadRequest(returnJob.ToString());
             }
-            //member.Password = query.password ?? member.Password;
-            member.MemberName = query.memberName ?? member.MemberName;
+
+            var firstCar = member.Cars.FirstOrDefault();
+
+            if (firstCar != null)
+            {
+                firstCar.CarNumber = query.carNumber ?? firstCar.CarNumber;
+            }
+
             _context.Entry(member).Property(m => m.CreateDate).IsModified = false;
-            _context.Members.Update(member);
             await _context.SaveChangesAsync();
             returnJob = new JObject
             {
