@@ -56,7 +56,7 @@ namespace ParkingHelp.Controllers
             {
                 var newCar = new MemberCar
                 {
-                    CarNumber = param.CarNumber,
+                    CarNumber = param.CarNumber.Trim(),
                     MemberId = param.MemberId,
                     CreateDate = DateTime.UtcNow,
                     UpdateDate = DateTime.UtcNow
