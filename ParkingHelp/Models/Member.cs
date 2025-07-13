@@ -24,9 +24,9 @@ namespace ParkingHelp.Models
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
         public ICollection<MemberCar> Cars { get; set; } = new List<MemberCar>();
-        [JsonIgnore]
+        
         public ICollection<ReqHelp> HelpRequests { get; set; } = new List<ReqHelp>();
-        [JsonIgnore]
+        
         public ICollection<HelpOffer> HelpOffers { get; set; } = new List<HelpOffer>();
     }
 }

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
+using ParkingHelp.DB.DTO;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.Models;
 using System.Linq;
@@ -38,9 +39,32 @@ namespace ParkingHelp.Controllers
                 DateTime fromDate = query.FromReqDate ?? startOfToday;
                 DateTime toDate = query.ToReqDate ?? endOfToday;
                 var reqHelps = await _context.ReqHelps
-                    .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate)
-                    .OrderBy(x => x.ReqDate).ToListAsync();
-                
+                    .Include(r => r.HelpRequester)
+                    .Include(r => r.Helper)
+                    .Include(r => r.ReqCar)
+                     .Select(r => new ReqHelpDto
+                     {
+                         Id = r.Id,
+                         ReqDate = r.ReqDate,
+                         HelpDate = r.HelpDate,
+                         HelpRequester = new HelpRequesterDto
+                         {
+                             Id = r.HelpRequester.Id,
+                             HelpRequesterName = r.HelpRequester.MemberName
+                         },
+                         Helper = r.Helper == null ? null : new HelperDto
+                         {
+                             Id = r.Helper.Id,
+                             HelperName = r.Helper.MemberName
+                         },
+                         ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
+                         {
+                             Id = r.ReqCar.Id,
+                             CarNumber = r.ReqCar.CarNumber
+                         }
+                     })
+                    .ToListAsync();
+
                 return Ok(reqHelps);
             }
             catch (Exception ex)
@@ -81,7 +105,7 @@ namespace ParkingHelp.Controllers
         [HttpPut("RequestHelp/{id}")]
         public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpPutParam query)
         {
-            var reqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == id);
+            var reqHelp = await _context.ReqHelps.Include(x => x.Helper).FirstOrDefaultAsync(x => x.Id == id && x.HelperMemId == query.HelperMemId);
 
             if (reqHelp == null)
             {
