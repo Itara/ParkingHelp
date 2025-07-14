@@ -147,6 +147,14 @@ namespace ParkingHelp.Controllers
                 return BadRequest(returnJob.ToString());
             }
         }
-
+        private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
+        {
+            return new JObject
+            {
+                { "Result", "Error" },
+                { "ErrorMsg", errorMessage },
+                { "InnerException" , InnerExceptionMessage}
+            };
+        }
     }
 }

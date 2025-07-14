@@ -23,6 +23,8 @@ namespace ParkingHelp.Models
         public DateTime ReqDate { get; set; }
         [Column("reserve_car_id")]
         public int? ReserveCarId { get; set; }
+        [Column("help_date")]
+        public DateTime HelpDate { get; set; }
 
         public Member Helper { get; set; } = null!;
         public Member? Requester { get; set; } = null!;

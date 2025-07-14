@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.DTO;
 using ParkingHelp.DB.QueryCondition;
@@ -83,14 +84,25 @@ namespace ParkingHelp.Controllers
                         break;
                 }
 
-                var result = await query.Take(param.MaxCount).ToListAsync();
+                var result = await query.Take(param.MaxCount ?? 5).ToListAsync();
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                return BadRequest(new { Result = "Fail", ErrMsg = ex.Message });
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
             }
         }
+        private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
+        {
+            return new JObject
+            {
+                { "Result", "Error" },
+                { "ErrorMsg", errorMessage },
+                { "InnerException" , InnerExceptionMessage}
+            };
+        }
+
     }
 }
