@@ -92,7 +92,8 @@ namespace ParkingHelp.Controllers
                         CarNumber = r.ReqCar.CarNumber
                     }
                 })
-                .OrderBy(r => r.Id)
+                .OrderBy(r => r.Status)
+                .ThenBy(r => r.ReqDate)
                 .ToListAsync();
 
                 return Ok(reqHelps);
