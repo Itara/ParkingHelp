@@ -13,7 +13,11 @@ builder.WebHost.UseUrls($"http://*:{port}");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 // Add services to the container.
+Console.WriteLine($"Connection String is : {builder.Configuration.GetConnectionString("DefaultConnection")}");
+var config = builder.Configuration;
 
+var slackToken = config["Slack:BotToken"]; // 환경변수: Slack__BotToken
+Console.WriteLine($"slackToken Get : {slackToken}");
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
