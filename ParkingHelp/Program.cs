@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Microsoft.Playwright;
 using ParkingHelp.DB;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
@@ -81,5 +82,40 @@ app.UseSwaggerUI(c =>
 
 app.UseAuthorization();
 app.MapControllers();
+
+_= Task.Run(async () =>
+{
+    using var playwright = await Playwright.CreateAsync();
+    var browser = await playwright.Chromium.LaunchAsync(new()
+    {
+        Headless = false,
+        SlowMo = 100
+    });
+
+    var context = await browser.NewContextAsync();
+    var page = await context.NewPageAsync();
+
+    Console.WriteLine("🌐 로그인 페이지 이동 중...");
+    await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new PageGotoOptions
+    {
+        Timeout = 60000
+    });
+
+    // 입력 대기 후 아이디, 비밀번호 채우기
+    await page.WaitForSelectorAsync("#id");
+    await page.FillAsync("#id", "C2115");
+    await page.FillAsync("#password", "6636");
+
+    // 로그인 버튼 클릭
+    await page.ClickAsync("#loginBtn");
+
+    // 로그인 후 URL 또는 특정 요소 대기 (필요시 수정)
+    await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+    await page.ScreenshotAsync(new() { Path = "after_login.png" });
+
+    Console.WriteLine("✅ 로그인 완료! after_login.png 확인해보세요.");
+    Console.ReadLine();
+
+});
 
 app.Run();
