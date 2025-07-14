@@ -1,10 +1,24 @@
-﻿namespace ParkingHelp.Models
-{
+﻿using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
 
+namespace ParkingHelp.Models
+{
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum  CarHelpStatus
     {
+        [EnumMember(Value = "Waiting (대기)")]
         Waiting = 0, // 대기
+        [EnumMember(Value = "Check (주차요청도움 확인상태)")]
         Check = 1, // 주차요청도움 확인상태
+        [EnumMember(Value = "Completed (주차등록완료)")]
         Completed = 2, // 주차등록완료
+    }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum  RankingOrderType
+    {
+        [EnumMember(Value = "Ascending (오름차순)")]
+        Ascending = 0, // 오름차순
+        [EnumMember(Value = "Descending (내림차순)")]
+        Descending = 1, // 내림차순
     }
 }

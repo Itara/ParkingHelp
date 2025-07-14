@@ -25,9 +25,9 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "ParkingHelp",
+        Title = "Parking Help",
         Version = "v1",
-        Description = "Pharmsoft ParkingHelp RestAPI"
+        Description = "Pharmsoft ParkingHelp Rest API"
     });
 
     c.EnableAnnotations();

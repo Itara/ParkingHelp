@@ -170,7 +170,7 @@ namespace ParkingHelp.Controllers
             try
             {
                 reqHelp.Status = query.Status ?? reqHelp.Status;
-                reqHelp.HelperMemId = query.HelperMemId ?? reqHelp.HelperMemId;
+                reqHelp.HelperMemId = query.HelperMemId;
                 reqHelp.HelpDate = query.HelpDate ?? reqHelp.HelpDate;
                 await _context.SaveChangesAsync();
 
