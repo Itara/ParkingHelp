@@ -40,7 +40,9 @@ namespace ParkingHelp.Controllers
                 var reqHelps = await _context.ReqHelps
                     .Include(x => x.HelpRequester.HelpRequests)
                     .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate)
-                    .OrderBy(x => x.ReqDate).ToListAsync();
+                    .OrderBy(x => x.Status)
+                    .ThenBy(x => x.ReqDate)
+                    .ToListAsync();
                 
                 return Ok(reqHelps);
             }
