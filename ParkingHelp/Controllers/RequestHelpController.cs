@@ -27,7 +27,7 @@ namespace ParkingHelp.Controllers
         /// </summary>
         /// <param name="query"></param>
         /// <returns></returns>
-        [HttpGet("RequestHelp")]
+        [HttpGet()]
         public async Task<IActionResult> GetRequestHelp([FromQuery] RequestHelpGetParam query)
         {
             try
@@ -38,33 +38,57 @@ namespace ParkingHelp.Controllers
                 
                 DateTime fromDate = query.FromReqDate ?? startOfToday;
                 DateTime toDate = query.ToReqDate ?? endOfToday;
-                var reqHelps = await _context.ReqHelps
+
+                var reqHelpsQuery = _context.ReqHelps
                     .Include(r => r.HelpRequester)
                     .Include(r => r.Helper)
                     .Include(r => r.ReqCar)
-                     .Select(r => new ReqHelpDto
-                     {
-                         Id = r.Id,
-                         ReqDate = r.ReqDate,
-                         HelpDate = r.HelpDate,
-                         Status = r.Status,
-                         HelpRequester = new HelpRequesterDto
-                         {
-                             Id = r.HelpRequester.Id,
-                             HelpRequesterName = r.HelpRequester.MemberName
-                         },
-                         Helper = r.Helper == null ? null : new HelperDto
-                         {
-                             Id = r.Helper.Id,
-                             HelperName = r.Helper.MemberName
-                         },
-                         ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
-                         {
-                             Id = r.ReqCar.Id,
-                             CarNumber = r.ReqCar.CarNumber
-                         }
-                     })
-                    .ToListAsync();
+                    .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate);
+
+                if (query.HelpReqMemId.HasValue)
+                {
+                    reqHelpsQuery = reqHelpsQuery.Where(r => r.HelpRequester.Id == query.HelpReqMemId);
+                }
+
+                if (query.HelperMemId.HasValue)
+                {
+                    reqHelpsQuery = reqHelpsQuery.Where(r => r.Helper != null && r.Helper.Id == query.HelperMemId);
+                }
+
+                if (!string.IsNullOrEmpty(query.ReqCarNumber))
+                {
+                    reqHelpsQuery = reqHelpsQuery.Where(r => r.ReqCar != null && r.ReqCar.CarNumber == query.ReqCarNumber);
+                }
+
+                if (query.Status.HasValue)
+                {
+                    reqHelpsQuery = reqHelpsQuery.Where(r => r.Status == query.Status);
+                }
+
+                var reqHelps = await reqHelpsQuery
+                .Select(r => new ReqHelpDto
+                {
+                    Id = r.Id,
+                    ReqDate = r.ReqDate,
+                    HelpDate = r.HelpDate,
+                    Status = r.Status,
+                    HelpRequester = new HelpRequesterDto
+                    {
+                        Id = r.HelpRequester.Id,
+                        HelpRequesterName = r.HelpRequester.MemberName
+                    },
+                    Helper = r.Helper == null ? null : new HelperDto
+                    {
+                        Id = r.Helper.Id,
+                        HelperName = r.Helper.MemberName
+                    },
+                    ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
+                    {
+                        Id = r.ReqCar.Id,
+                        CarNumber = r.ReqCar.CarNumber
+                    }
+                })
+                .ToListAsync();
 
                 return Ok(reqHelps);
             }
@@ -79,7 +103,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpPost("RequestHelp")]
+        [HttpPost()]
         public async Task<IActionResult> PostRequestHelp([FromBody] RequestHelpPostParam query)
         {
             try
@@ -133,7 +157,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpPut("RequestHelp/{id}")]
+        [HttpPut("{id}")]
         public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpPutParam query)
         {
             var reqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == id);
@@ -187,7 +211,7 @@ namespace ParkingHelp.Controllers
                 return BadRequest(jResult.ToString());
             }
         }
-        [HttpDelete("RequestHelp/{id}")]
+        [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRequestHelp(int id)
         {
             var reqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == id);
