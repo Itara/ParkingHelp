@@ -22,6 +22,8 @@ namespace ParkingHelp.Models
         [Column("create_date")]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]  
         public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+        [Column("slack_id")]
+        public string? SlackId { get; set; }
 
         public ICollection<MemberCar> Cars { get; set; } = new List<MemberCar>();
         

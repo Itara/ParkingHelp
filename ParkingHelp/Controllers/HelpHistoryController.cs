@@ -44,6 +44,7 @@ namespace ParkingHelp.Controllers
                 return BadRequest(new { Result = "Fail", ErrMsg = ex.Message });
             }
         }
+
         [NonAction]
         public async Task<List<ReqHelpDto>> GetHelpListFromReqHelp(int helpMemberId, DateTime fromDate, DateTime toDate)
         {

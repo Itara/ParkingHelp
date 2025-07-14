@@ -6,12 +6,16 @@ namespace ParkingHelp.DB.DTO
     {
         public int Id { get; set; }
         public string HelpRequesterName { get; set; } = string.Empty;
+        public string? RequesterEmail { get; set; } = string.Empty;
+        public string? SlackId { get; set; } = string.Empty;
     }
 
     public class HelperDto
     {
         public int Id { get; set; }
         public string HelperName { get; set; } = string.Empty;
+        public string? HelperEmail { get; set; } = string.Empty;
+        public string? SlackId { get; set; } = string.Empty;
     }
 
     public class ReqHelpCarDto

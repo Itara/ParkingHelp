@@ -1,10 +1,12 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages.Manage;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.Models;
+using ParkingHelp.SlackBot;
 using System.Diagnostics;
 
 namespace ParkingHelp.Controllers
@@ -14,11 +16,13 @@ namespace ParkingHelp.Controllers
     public class MemberController : ControllerBase
     {
         private readonly AppDbContext _context;
-
-        public MemberController(AppDbContext context)
+        private readonly SlackNotifier _slackNotifier;
+        public MemberController(AppDbContext context, SlackOptions slackOptions)
         {
             _context = context;
+            _slackNotifier = new SlackNotifier(slackOptions);
         }
+   
         [HttpGet("Members")]
         public async Task<IActionResult> GetMembers([FromQuery] MemberGetParam param)
         {
@@ -43,7 +47,7 @@ namespace ParkingHelp.Controllers
                    ? query
                    : query.Where(m => m.Cars.Any(mc => mc.CarNumber.Contains(carNumber)));
 
-                var result = await query.Include(m => m.Cars).ToListAsync();
+                var result = await query.Include(m => m.Cars).OrderBy(r => r.Id).ToListAsync();
 
                 return Ok(result);
             }
@@ -66,7 +70,8 @@ namespace ParkingHelp.Controllers
                 var newMember = new Member
                 {
                     MemberLoginId = query.memberLoginId,
-                    MemberName = query.memberName
+                    MemberName = query.memberName,
+                    Email = query.email ?? "" ,
                 };
                 _context.Members.Add(newMember);
                 await _context.SaveChangesAsync();
@@ -79,6 +84,17 @@ namespace ParkingHelp.Controllers
                 };
                 await _context.MemberCars.AddAsync(newCar);
                 await _context.SaveChangesAsync();
+                //Email로 슬랙 계정 검색
+                if (!string.IsNullOrEmpty(newMember.Email))
+                {
+                    SlackUserByEmail? findUser = await _slackNotifier.FindUserByEmailAsync(newMember.Email);
+                    if (findUser != null)
+                    {
+                        newMember.SlackId = findUser?.Id;
+                        _context.Members.Update(newMember);
+                        await _context.SaveChangesAsync();
+                    }
+                }
                 return Ok(newMember);
             }
             catch (Exception ex)
