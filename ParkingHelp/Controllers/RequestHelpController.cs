@@ -13,11 +13,11 @@ namespace ParkingHelp.Controllers
     
     [Route("api/[controller]")]
     [ApiController]
-    public class ParkingHelperController : ControllerBase
+    public class RequestHelpController : ControllerBase
     {
         private readonly AppDbContext _context;
 
-        public ParkingHelperController(AppDbContext context)
+        public RequestHelpController(AppDbContext context)
         {
             _context = context;
         }
@@ -89,16 +89,46 @@ namespace ParkingHelp.Controllers
                     HelpReqMemId = query.HelpReqMemId ?? 0,
                     Status = 0,
                     ReqCarId = query.CarId,
-                    carNumber = query.CarNumber ?? string.Empty,
                     ReqDate = DateTime.UtcNow
                 };
                 _context.ReqHelps.Add(newReqHelp);
                 await _context.SaveChangesAsync();
-                return Ok(newReqHelp);
+
+                var returnNewReqHelps = await _context.ReqHelps
+                   .Include(r => r.HelpRequester)
+                   .Include(r => r.Helper)
+                   .Include(r => r.ReqCar)
+                   .Select(r => new ReqHelpDto
+                    {
+                        Id = r.Id,
+                        ReqDate = r.ReqDate,
+                        HelpDate = r.HelpDate,
+                        Status = r.Status,
+                        HelpRequester = new HelpRequesterDto
+                        {
+                            Id = r.HelpRequester.Id,
+                            HelpRequesterName = r.HelpRequester.MemberName
+                        },
+                        Helper = r.Helper == null ? null : new HelperDto
+                        {
+                            Id = r.Helper.Id,
+                            HelperName = r.Helper.MemberName
+                        },
+                        ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
+                        {
+                            Id = r.ReqCar.Id,
+                            CarNumber = r.ReqCar.CarNumber
+                        }
+                    })
+                   .Where(x => x.Id == newReqHelp.Id)
+                   .ToListAsync();
+
+
+                return Ok(returnNewReqHelps);
             }
             catch (Exception ex)
             {
-                JObject jResult = GetErrorJobject(ex.Message);
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
                 return BadRequest(jResult.ToString());
             }
         }
@@ -106,7 +136,7 @@ namespace ParkingHelp.Controllers
         [HttpPut("RequestHelp/{id}")]
         public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpPutParam query)
         {
-            var reqHelp = await _context.ReqHelps.Include(x => x.Helper).FirstOrDefaultAsync(x => x.Id == id && x.HelperMemId == query.HelperMemId);
+            var reqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == id);
 
             if (reqHelp == null)
             {
@@ -119,11 +149,41 @@ namespace ParkingHelp.Controllers
                 reqHelp.HelperMemId = query.HelperMemId ?? reqHelp.HelperMemId;
                 reqHelp.HelpDate = query.HelpDate ?? reqHelp.HelpDate;
                 await _context.SaveChangesAsync();
-                return Ok(reqHelp);
+
+                var updateReqHelps = await _context.ReqHelps
+                   .Include(r => r.HelpRequester)
+                   .Include(r => r.Helper)
+                   .Include(r => r.ReqCar)
+                    .Select(r => new ReqHelpDto
+                    {
+                        Id = r.Id,
+                        ReqDate = r.ReqDate,
+                        HelpDate = r.HelpDate,
+                        Status = r.Status,
+                        HelpRequester = new HelpRequesterDto
+                        {
+                            Id = r.HelpRequester.Id,
+                            HelpRequesterName = r.HelpRequester.MemberName
+                        },
+                        Helper = r.Helper == null ? null : new HelperDto
+                        {
+                            Id = r.Helper.Id,
+                            HelperName = r.Helper.MemberName
+                        },
+                        ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
+                        {
+                            Id = r.ReqCar.Id,
+                            CarNumber = r.ReqCar.CarNumber
+                        }
+                    }).Where(x => x.Id == id)
+                   .ToListAsync();
+
+
+                return Ok(updateReqHelps);
             }
             catch (Exception ex)
             {
-                JObject jResult = GetErrorJobject(ex.Message);
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
                 return BadRequest(jResult.ToString());
             }
         }
@@ -145,18 +205,19 @@ namespace ParkingHelp.Controllers
             }
             catch (Exception ex)
             {
-                JObject jResult = GetErrorJobject(ex.Message);
+                JObject jResult = GetErrorJobject(ex.Message,ex.InnerException?.ToString() ?? "InnerException is Null");
                 return BadRequest(jResult.ToString());
             }
         }
 
 
-        private JObject GetErrorJobject(string errorMessage)
+        private JObject GetErrorJobject(string errorMessage,string InnerExceptionMessage)
         {
             return new JObject
             {
                 { "Result", "Error" },
-                { "ErrorMsg", errorMessage }
+                { "ErrorMsg", errorMessage },
+                { "InnerException" , InnerExceptionMessage}
             };
         }
     }

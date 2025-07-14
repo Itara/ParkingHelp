@@ -52,6 +52,7 @@ namespace ParkingHelp.DB.QueryCondition
         /// <summary>
         /// 요청 차량 번호
         /// </summary>
+        [DefaultValue("사용안함 혹시몰라서 만든거 무시해도 됨")]
         public string? CarNumber { get; set; }
     }
 

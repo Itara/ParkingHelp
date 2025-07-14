@@ -10,7 +10,7 @@ namespace ParkingHelp.Controllers
         [HttpGet]
         public IActionResult Index()
         {
-            return Ok("✅ PharmSoft Parking Helper Rest API서버 정상 작동 중 ");
+            return Ok("✅ PharmSoft Parking Helper Rest API Start..!! ");
         }
     }
 }
