@@ -112,7 +112,7 @@ namespace ParkingHelp.Controllers
         public async Task<IActionResult> UpdateMember(int id, [FromBody] MemberUpdateParam query)
         {
             JObject returnJob = new JObject();
-            var member = await _context.Members.FindAsync(id);
+            var member = await _context.Members.Include(m => m.Cars).FirstOrDefaultAsync(m => m.Id == id);
             if (member == null)
             {
                 returnJob = new JObject
@@ -122,11 +122,32 @@ namespace ParkingHelp.Controllers
                 };
                 return BadRequest(returnJob.ToString());
             }
-            //member.Password = query.password ?? member.Password;
-            member.MemberName = query.memberName ?? member.MemberName;
-            _context.Entry(member).Property(m => m.CreateDate).IsModified = false;
+
+            if (!string.IsNullOrWhiteSpace(query.carNumber))
+            {
+                var car = member.Cars.FirstOrDefault();
+                if (car != null)
+                {
+                    car.CarNumber = query.carNumber;
+                    car.UpdateDate = DateTime.UtcNow;
+                    _context.MemberCars.Update(car);
+                }
+                else
+                {
+                    var newCar = new MemberCar
+                    {
+                        MemberId = member.Id,
+                        CarNumber = query.carNumber,
+                        CreateDate = DateTime.UtcNow,
+                        UpdateDate = DateTime.UtcNow
+                    };
+                    await _context.MemberCars.AddAsync(newCar);
+                }
+            }
+
             _context.Members.Update(member);
             await _context.SaveChangesAsync();
+
             returnJob = new JObject
             {
                 { "Result", "Success" },
