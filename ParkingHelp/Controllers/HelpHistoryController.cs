@@ -2,8 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ParkingHelp.DB;
-using ParkingHelp.DB.DTO;
 using ParkingHelp.DB.QueryCondition;
+using ParkingHelp.DTO;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace ParkingHelp.Controllers
@@ -28,7 +28,7 @@ namespace ParkingHelp.Controllers
                 DateTime endOfToday = startOfToday.AddDays(1).AddSeconds(-1); // 현재 날짜의 끝
                 DateTime from = param.FromHelpDate ?? startOfToday;
                 DateTime to = param.ToHelpDate ?? endOfToday;
-                List<ReqHelpDto> helpListFromReqHelp = await GetHelpListFromReqHelp(param.HelperMemId, from,to);
+                List<ReqHelpDto> helpListFromReqHelp = await GetHelpListFromReqHelp(param.HelperMemId, from, to);
                 List<HelpOfferDTO> helpListFromHelpOffer = await GetHelpListFromHelpOffer(param.HelperMemId, from, to);
                 HelpHistoryDTO helpHistoryDTO = new HelpHistoryDTO
                 {

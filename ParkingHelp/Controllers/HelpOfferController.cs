@@ -59,7 +59,7 @@ namespace ParkingHelp.Controllers
             {
                 var newHelpOffer = new HelpOffer
                 {
-                 
+
                 };
                 _context.HelpOffers.Add(newHelpOffer);
                 await _context.SaveChangesAsync();
@@ -84,7 +84,7 @@ namespace ParkingHelp.Controllers
 
             try
             {
-              
+
                 await _context.SaveChangesAsync();
                 return Ok(reqHelp);
             }

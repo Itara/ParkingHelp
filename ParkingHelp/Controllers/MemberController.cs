@@ -22,7 +22,7 @@ namespace ParkingHelp.Controllers
             _context = context;
             _slackNotifier = new SlackNotifier(slackOptions);
         }
-   
+
         [HttpGet("Members")]
         public async Task<IActionResult> GetMembers([FromQuery] MemberGetParam param)
         {
@@ -51,7 +51,7 @@ namespace ParkingHelp.Controllers
 
                 return Ok(result);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 JObject returnJob = new JObject
                 {
@@ -71,7 +71,7 @@ namespace ParkingHelp.Controllers
                 {
                     MemberLoginId = query.memberLoginId,
                     MemberName = query.memberName,
-                    Email = query.email ?? "" ,
+                    Email = query.email ?? "",
                 };
                 _context.Members.Add(newMember);
                 await _context.SaveChangesAsync();

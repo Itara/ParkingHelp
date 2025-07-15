@@ -1,6 +1,6 @@
 ﻿using ParkingHelp.Models;
 
-namespace ParkingHelp.DB.DTO
+namespace ParkingHelp.DTO
 {
     public class HelpOfferDTO
     {

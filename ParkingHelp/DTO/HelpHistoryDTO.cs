@@ -1,4 +1,4 @@
-﻿namespace ParkingHelp.DB.DTO
+﻿namespace ParkingHelp.DTO
 {
     public class HelpHistoryDTO
     {

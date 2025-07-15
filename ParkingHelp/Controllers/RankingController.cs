@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
-using ParkingHelp.DB.DTO;
+using ParkingHelp.DTO;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.Models;
 using System.Linq;
@@ -58,8 +58,8 @@ namespace ParkingHelp.Controllers
                 var combinedStats = reqHelpStats.Concat(helpOfferStats).GroupBy(x => x.MemberId)
                     .Select(g => new
                     {
-                       MemberId = g.Key,
-                       TotalHelpCount = g.Sum(x => x.Count)
+                        MemberId = g.Key,
+                        TotalHelpCount = g.Sum(x => x.Count)
                     });
 
                 // 정렬 + Join + Take
