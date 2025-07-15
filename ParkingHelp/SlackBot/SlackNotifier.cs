@@ -12,6 +12,7 @@ namespace ParkingHelp.SlackBot
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
         public string Email { get; set; } = "";
+        public long ? SlackThreadTs { get; set; } = null; // 슬랙 스레드 타임스탬프 (고유  ID)
     }
 
     public class SlackOptions
@@ -34,23 +35,29 @@ namespace ParkingHelp.SlackBot
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _botToken);
         }
 
-        public async Task SendMessageAsync(string message)
+        public async Task<JObject> SendMessageAsync(string message,string? slackThreadTs = null)
         {
             var payload = new
             {
-                channel = _sendChannelID,  // "#general" 또는 채널 ID ("C01XXXXXX")
+                channel = _sendChannelID,
                 text = message,
-                link_names = true
+                link_names = true,
+                thread_ts = string.IsNullOrEmpty(slackThreadTs) ? null : slackThreadTs
             };
+            
+            var json = JsonConvert.SerializeObject(payload, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
 
-            var content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync("https://slack.com/api/chat.postMessage", content);
             var responseText = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine("슬랙 메시지 전송 실패: " + response.StatusCode);
-                Console.WriteLine(responseText);
+                return JObject.Parse(responseText);
             }
             else
             {
@@ -58,11 +65,12 @@ namespace ParkingHelp.SlackBot
                 if (!Convert.ToBoolean(responseJobj["ok"]))
                 {
                     Console.WriteLine("슬랙 메시지 전송 실패");
-                    Console.WriteLine($"{responseText}");
+                    return JObject.Parse(responseText);
                 }
                 else
                 {
-                    Console.WriteLine("슬랙 메시지 전송 성공!");
+                    Console.WriteLine ("슬랙 메시지 전송 성공!");
+                    return JObject.Parse(responseText);
                 }
             }
         }

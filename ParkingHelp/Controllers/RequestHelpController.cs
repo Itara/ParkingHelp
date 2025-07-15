@@ -36,12 +36,17 @@ namespace ParkingHelp.Controllers
         {
             try
             {
-                DateTime nowKST = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul"));
-                DateTime startOfToday = nowKST.Date; //
-                DateTime endOfToday = startOfToday.AddDays(1).AddSeconds(-1);
+                TimeZoneInfo kstZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul");
 
-                DateTime fromDate = query.FromReqDate ?? startOfToday;
-                DateTime toDate = query.ToReqDate ?? endOfToday;
+                DateTime nowKST = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, kstZone);
+                DateTime startOfTodayKST = nowKST.Date; // 오늘 자정 (KST)
+                DateTime endOfTodayKST = startOfTodayKST.AddDays(1).AddSeconds(-1); // 오늘 23:59:59 (KST)
+
+                DateTime startUtc = TimeZoneInfo.ConvertTimeToUtc(startOfTodayKST, kstZone);
+                DateTime endUtc = TimeZoneInfo.ConvertTimeToUtc(endOfTodayKST, kstZone);
+
+                DateTime fromDate = query.FromReqDate ?? startUtc;
+                DateTime toDate = query.ToReqDate ?? endUtc;
 
                 var reqHelpsQuery = _context.ReqHelps
                     .Include(r => r.HelpRequester)
@@ -163,7 +168,7 @@ namespace ParkingHelp.Controllers
                 string requestSlackId = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.SlackId ?? "Unknown Slack ID";
                 string requestCarNumber = returnNewReqHelps.FirstOrDefault()?.ReqCar?.CarNumber ?? "Unknown Car Number";
 
-                if (requestSlackId == "Unknown Slack ID" && requestEmail != "Unknown Email")
+                if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
                 {
                     SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(requestEmail);
                     if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
@@ -171,18 +176,33 @@ namespace ParkingHelp.Controllers
                         requestSlackId = slackUser.Id;
                     }
                 }
+                JObject? resultSlaclSendMessage = null;
+                if (requestSlackId != "Unknown Slack ID")
+                {
+                    resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"<@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                }
+                else
+                {
+                    resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                }
 
-                //if(requestSlackId != "Unknown Slack ID")
-                //{
-                //    await _slackNotifier.SendMessageAsync($"@channel <@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
-                //}
-                //else
-                //{
-                //    await _slackNotifier.SendMessageAsync($"@channel 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
-                //}
-
-                return Ok(returnNewReqHelps);
-
+                if (resultSlaclSendMessage != null && Convert.ToBoolean(resultSlaclSendMessage["ok"])) // 슬랙 메시지 전송 성공시
+                {
+                    if (!string.IsNullOrEmpty(resultSlaclSendMessage["ts"]?.ToString()))
+                    {
+                        newReqHelp.SlackThreadTs = resultSlaclSendMessage["ts"]?.ToString();
+                        await _context.SaveChangesAsync();
+                        ReqHelpDto reqHelpDto = returnNewReqHelps.First();
+                        reqHelpDto.UpdateSlackThreadTs = newReqHelp.SlackThreadTs;
+                    }
+                    return Ok(returnNewReqHelps);
+                }
+                else
+                {
+                    Console.WriteLine("슬랙 메시지 전송 실패: " + resultSlaclSendMessage?.ToString());
+                    return Ok(returnNewReqHelps);
+                }
+                //Azure 서버도 넣어야하고 할께 많은데 시간은 없고 용준아 잘좀하자
             }
             catch (Exception ex)
             {
@@ -250,7 +270,7 @@ namespace ParkingHelp.Controllers
                 string helperEmail = updateReqHelps.FirstOrDefault()?.Helper?.HelperEmail ?? "Unknown Helper Email";
                 string helperSlackId = updateReqHelps.FirstOrDefault()?.Helper?.SlackId ?? "Unknown Helper Slack ID";
 
-                if (requestSlackId == "Unknown Slack ID" && requestEmail != "Unknown Email")
+                if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
                 {
                     SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(requestEmail);
                     if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
@@ -259,7 +279,7 @@ namespace ParkingHelp.Controllers
                     }
                 }
 
-                if (helperSlackId == "Unknown Helper Slack ID" && helperEmail != "Unknown Helper Email")
+                if ((string.IsNullOrEmpty(helperSlackId) || helperSlackId == "Unknown Helper Slack ID") && helperEmail != "Unknown Helper Email")
                 {
                     SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(helperEmail);
                     if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
@@ -268,41 +288,41 @@ namespace ParkingHelp.Controllers
                     }
                 }
 
-                if (query.Status.HasValue)
-                {
-                    //switch ((CarHelpStatus)query.Status)
-                    //{
-                    //    case CarHelpStatus.Completed: //주차등록이 완료 
-                    //        if (requestSlackId != "Unknown Slack ID" && helperSlackId != "Unknown Helper Slack ID") //slackID를 둘다 찾은경우
-                    //        {
-                    //            await _slackNotifier.SendMessageAsync($"<@{helperSlackId}>님이 <@{requestSlackId}> 의 차량({requestCarNumber}) 주차 등록을 완료했습니다! ");
-                    //        }
-                    //        else if (requestSlackId != "Unknown Slack ID" && helperSlackId == "Unknown Helper Slack ID") //요청자의 SlackID만 존재할경우
-                    //        {
-                    //            await _slackNotifier.SendMessageAsync($"@channel <@{requestSlackId}>의 차량({requestCarNumber})을 {helperName}님이 주차 등록을 완료했습니다!!");
-                    //        }
-                    //        else
-                    //        {
-                    //            await _slackNotifier.SendMessageAsync($"@channel 차량({requestCarNumber})주차등록을 {helperName}님이 주차 등록을 완료했습니다!!");
-                    //        }
-                    //        break;
+                //if (query.Status.HasValue)
+                //{
+                //    switch ((CarHelpStatus)query.Status)
+                //    {
+                //        case CarHelpStatus.Completed: //주차등록이 완료 
+                //            if (requestSlackId != "Unknown Slack ID" && helperSlackId != "Unknown Helper Slack ID") //slackID를 둘다 찾은경우
+                //            {
+                //                await _slackNotifier.SendMessageAsync($"<@{helperSlackId}>님이 <@{requestSlackId}> 의 차량({requestCarNumber}) 주차 등록을 완료했습니다! ", reqHelp.SlackThreadTs);
+                //            }
+                //            else if (requestSlackId != "Unknown Slack ID" && helperSlackId == "Unknown Helper Slack ID") //요청자의 SlackID만 존재할경우
+                //            {
+                //                await _slackNotifier.SendMessageAsync($"@channel <@{requestSlackId}>의 차량({requestCarNumber})을 {helperName}님이 주차 등록을 완료했습니다!!", reqHelp.SlackThreadTs);
+                //            }
+                //            else
+                //            {
+                //                await _slackNotifier.SendMessageAsync($"@channel 차량({requestCarNumber})주차등록을 {helperName}님이 주차 등록을 완료했습니다!!", reqHelp.SlackThreadTs);
+                //            }
+                //            break;
 
-                    //    case CarHelpStatus.Check:
-                    //        if (requestSlackId != "Unknown Slack ID" && helperSlackId != "Unknown Helper Slack ID") //slackID를 둘다 찾은경우
-                    //        {
-                    //            await _slackNotifier.SendMessageAsync($"<@{requestSlackId}> 의 차량({requestCarNumber})을 <@{helperSlackId}>님이 주차 등록 요청을 확인했어요! ");
-                    //        }
-                    //        else if (requestSlackId != "Unknown Slack ID" && helperSlackId == "Unknown Helper Slack ID") //요청자의 SlackID만 존재할경우
-                    //        {
-                    //            await _slackNotifier.SendMessageAsync($"@channel <@{requestSlackId}> 의 차량({requestCarNumber})을 {helperName}님이 주차 등록 요청을 확인했어요!");
-                    //        }
-                    //        else
-                    //        {
-                    //            await _slackNotifier.SendMessageAsync($"@channel 차량({requestCarNumber}) 주차등록을 {helperName}님이 주차 등록 요청을 확인했습니다!");
-                    //        }
-                    //        break;
-                    //}
-                }
+                //        case CarHelpStatus.Check:
+                //            if (requestSlackId != "Unknown Slack ID" && helperSlackId != "Unknown Helper Slack ID") //slackID를 둘다 찾은경우
+                //            {
+                //                await _slackNotifier.SendMessageAsync($"<@{requestSlackId}> 의 차량({requestCarNumber})을 <@{helperSlackId}>님이 주차 등록 요청을 확인했어요! ", reqHelp.SlackThreadTs);
+                //            }
+                //            else if (requestSlackId != "Unknown Slack ID" && helperSlackId == "Unknown Helper Slack ID") //요청자의 SlackID만 존재할경우
+                //            {
+                //                await _slackNotifier.SendMessageAsync($"@channel <@{requestSlackId}> 의 차량({requestCarNumber})을 {helperName}님이 주차 등록 요청을 확인했어요!", reqHelp.SlackThreadTs);
+                //            }
+                //            else
+                //            {
+                //                await _slackNotifier.SendMessageAsync($"@channel 차량({requestCarNumber}) 주차등록을 {helperName}님이 주차 등록 요청을 확인했습니다!", reqHelp.SlackThreadTs);
+                //            }
+                //            break;
+                //    }
+                //}
 
                 return Ok(updateReqHelps);
             }

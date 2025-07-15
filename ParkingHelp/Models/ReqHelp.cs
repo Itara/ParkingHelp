@@ -25,6 +25,8 @@ namespace ParkingHelp.Models
         public DateTime? HelpDate { get; set; }
         [Column("confirm_date")]
         public DateTime? ConfirmDate { get; set; }
+        [Column("slack_thread_ts")]
+        public string? SlackThreadTs { get; set; }
 
         public Member HelpRequester { get; set; } = null!;
         public Member? Helper { get; set; }

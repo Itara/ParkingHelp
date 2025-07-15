@@ -33,6 +33,8 @@ namespace ParkingHelp.DTO
         public HelperDto? Helper { get; set; }
         public ReqHelpCarDto? ReqCar { get; set; } = null!;
         public CarHelpStatus? Status { get; set; }
+        public string? UpdateSlackThreadTs { get; set; } = null!;
+
     }
 
 }
