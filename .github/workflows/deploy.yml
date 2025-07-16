@@ -1,24 +1,28 @@
-name:  Deploy to Azure VM
+name: Deploy to Azure VM
 
 on:
   push:
-    branches: [ master ]  # 또는 master
+    branches: [ master ]  # 또는 main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name:  Checkout source code
+    - name: Checkout source code
       uses: actions/checkout@v3
 
-    - name:  Setup SSH key
+    - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
-        ssh-keyscan -H 20.41.116.145 >> ~/.ssh/known_hosts
+        ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
-    - name:  Deploy to Azure VM
+    - name: Deploy to Azure VM
       run: |
-        rsync -avz -e "ssh -i ~/.ssh/deploy_key" ./ pharmsoft@20.41.116.145:/home/pharmsoft/ParkingHelp/
+        rsync -avz -e "ssh -i ~/.ssh/deploy_key" ./ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/pharmsoft/ParkingHelp/
+
+    - name: Run deploy script on Azure VM
+      run: |
+        ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} 'bash /home/pharmsoft/ParkingHelp/deploy.sh'
