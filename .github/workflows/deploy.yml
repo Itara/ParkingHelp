@@ -1,0 +1,24 @@
+name:  Deploy to Azure VM
+
+on:
+  push:
+    branches: [ master ]  # 또는 master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name:  Checkout source code
+      uses: actions/checkout@v3
+
+    - name:  Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H 20.41.116.145 >> ~/.ssh/known_hosts
+
+    - name:  Deploy to Azure VM
+      run: |
+        rsync -avz -e "ssh -i ~/.ssh/deploy_key" ./ pharmsoft@20.41.116.145:/home/pharmsoft/ParkingHelp/
