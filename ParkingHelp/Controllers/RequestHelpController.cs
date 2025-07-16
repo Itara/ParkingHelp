@@ -226,6 +226,7 @@ namespace ParkingHelp.Controllers
                 reqHelp.Status = query.Status ?? reqHelp.Status;
                 reqHelp.HelperMemId = query.HelperMemId;
                 reqHelp.HelpDate = query.HelpDate ?? reqHelp.HelpDate;
+                reqHelp.ConfirmDate = query.ConfirmDate ?? reqHelp.ConfirmDate;
                 await _context.SaveChangesAsync();
 
                 var updateReqHelps = await _context.ReqHelps

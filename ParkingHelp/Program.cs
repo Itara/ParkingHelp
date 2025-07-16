@@ -83,7 +83,7 @@ app.UseSwaggerUI(c =>
 
 app.UseAuthorization();
 app.MapControllers();
-
+/*
 _= Task.Run(async () =>
 {
     using var playwright = await Playwright.CreateAsync();
@@ -169,5 +169,5 @@ _= Task.Run(async () =>
         Debug.WriteLine($"{ex.Message}");
     }
 });
-
+*/
 app.Run();
