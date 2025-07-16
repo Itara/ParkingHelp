@@ -10,8 +10,8 @@ using System.Text.Json.Serialization; // DbContext 네임스페이스
 
 
 var builder = WebApplication.CreateBuilder(args);
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-builder.WebHost.UseUrls($"http://*:{port}");
+//var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
 var filePath = Path.Combine(Directory.GetCurrentDirectory(), "DB.json");
 var config = builder.Configuration;
