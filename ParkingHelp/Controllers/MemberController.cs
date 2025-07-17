@@ -48,9 +48,23 @@ namespace ParkingHelp.Controllers
                    ? query
                    : query.Where(m => m.Cars.Any(mc => mc.CarNumber.Contains(carNumber)));
 
-                var result = await query.Include(m => m.Cars).OrderBy(r => r.Id).ToListAsync();
-
-                return Ok(result);
+                var result = await query.Include(m => m.Cars)
+                    .OrderBy(r => r.Id).ToListAsync();
+                List<MemberDto> memberDtos = result.Select(m => new MemberDto
+                {
+                    Id = m.Id,
+                    Name = m.MemberName,
+                    Email = m.Email ?? "",
+                    MemberLoginId = m.MemberLoginId,
+                    SlackId = m.SlackId,
+                    Cars = m.Cars.Select(car => new MemberCarDTO
+                    {
+                        Id = car.Id,
+                        CarNumber = car.CarNumber
+                    }).ToList()
+                }).ToList();
+               
+                return Ok(memberDtos);
             }
             catch (Exception ex)
             {
