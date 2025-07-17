@@ -54,12 +54,12 @@ namespace ParkingHelp.Controllers
 
             try
             {
-                var newCar = new MemberCar
+                var newCar = new MemberCarModel
                 {
                     CarNumber = param.CarNumber.Trim(),
                     MemberId = param.MemberId,
-                    CreateDate = DateTime.UtcNow,
-                    UpdateDate = DateTime.UtcNow
+                    CreateDate = DateTimeOffset.UtcNow,
+                    UpdateDate = DateTimeOffset.UtcNow
                 };
                 await _context.MemberCars.AddAsync(newCar);
                 await _context.SaveChangesAsync();

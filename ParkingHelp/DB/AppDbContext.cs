@@ -6,72 +6,82 @@ namespace ParkingHelp.DB
     public class AppDbContext : DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-        public DbSet<Member> Members { get; set; }
-        public DbSet<MemberCar> MemberCars { get; set; }
-        public DbSet<ReqHelp> ReqHelps { get; set; }
-        public DbSet<HelpOffer> HelpOffers { get; set; }
+        public DbSet<MemberModel> Members { get; set; }
+        public DbSet<MemberCarModel> MemberCars { get; set; }
+        public DbSet<ReqHelpModel> ReqHelps { get; set; }
+        public DbSet<ReqHelpDetailModel> ReqHelpsDetail { get; set; }
+        public DbSet<HelpOfferModel> HelpOffers { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // 테이블명 설정 (대소문자 구분 방지)
-            modelBuilder.Entity<Member>().ToTable("member").Property(m => m.CreateDate).ValueGeneratedOnAdd();
-            modelBuilder.Entity<MemberCar>().ToTable("member_car");
-            modelBuilder.Entity<ReqHelp>().ToTable("req_help");
-            modelBuilder.Entity<HelpOffer>().ToTable("helpoffer");
+            // 테이블명 설정 ( PostgreSQL은 테이블 명을 소문자로 하는게 네이밍 규칙이라 소문자로 정의)
 
-            // ✅ UTC DateTime 컨벤션 적용 (원하면 전체 엔티티에)
-            foreach (var entity in modelBuilder.Model.GetEntityTypes())
-            {
-                foreach (var property in entity.GetProperties().Where(p => p.ClrType == typeof(DateTime)))
-                {
-                    property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime, DateTime>(
-                        v => v.Kind == DateTimeKind.Unspecified ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : v,
-                        v => DateTime.SpecifyKind(v, DateTimeKind.Utc)
-                    ));
-                }
-            }
+            modelBuilder.Entity<MemberModel>().ToTable("member");
+            modelBuilder.Entity<MemberCarModel>().ToTable("member_car");
+            modelBuilder.Entity<ReqHelpModel>().ToTable("req_help");
+            modelBuilder.Entity<ReqHelpDetailModel>().ToTable("req_help_detail");
+            modelBuilder.Entity<HelpOfferModel>().ToTable("help_offer"); // 
 
-            // 관계 설정
-            modelBuilder.Entity<MemberCar>()
+            //    // UTC DateTimeOffset 컨벤션 일괄 적용 -> Azure 시간 한국으로 일괄 설정함 (서버 및 DB모두)
+            //foreach (var entity in modelBuilder.Model.GetEntityTypes())
+            //{
+            //    foreach (var property in entity.GetProperties().Where(p => p.ClrType == typeof(DateTimeOffset)))
+            //    {
+            //        property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, DateTimeOffset>(
+            //            v => v.Kind == DateTimeOffsetKind.Unspecified ? DateTimeOffset.SpecifyKind(v, DateTimeOffsetKind.Utc) : v,
+            //            v => DateTimeOffset.SpecifyKind(v, DateTimeOffsetKind.Utc)
+            //        ));
+            //    }
+            //}
+
+            //Member ↔ MemberCar (1:N)
+            modelBuilder.Entity<MemberCarModel>()
                 .HasOne(mc => mc.Member)
                 .WithMany(m => m.Cars)
                 .HasForeignKey(mc => mc.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<ReqHelp>()
-                .HasOne(r => r.HelpRequester)
+
+                // ReqHelp ↔ Member (요청자)
+            modelBuilder.Entity<ReqHelpModel>()
+                .HasOne(r => r.HelpReqMember)
                 .WithMany(m => m.HelpRequests)
                 .HasForeignKey(r => r.HelpReqMemId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<ReqHelp>()
-                .HasOne(r => r.Helper)
-                .WithMany()
-                .HasForeignKey(r => r.HelperMemId)
-                .OnDelete(DeleteBehavior.SetNull);
+                // ReqHelp ↔ MemberCar (요청 차량)
+            modelBuilder.Entity<ReqHelpModel>()
+                .HasOne(r => r.ReqCar)
+                .WithMany(c => c.ReqHelps)
+                .OnDelete(DeleteBehavior.Cascade);
 
-            //modelBuilder.Entity<ReqHelp>()
-            //    .HasOne(r => r.ReqCar)
-            //    .WithMany(c => c.ReqHelps)
-            //    .HasForeignKey(r => r.ReqCarId)
-            //    .OnDelete(DeleteBehavior.Cascade);
+            // ReqHelpDetail ↔ ReqHelp (1:N)
+            modelBuilder.Entity<ReqHelpDetailModel>()
+                .HasOne(d => d.ReqHelps)
+                .WithMany(r => r.HelpDetails)
+                .HasForeignKey(d => d.Req_Id)
+                .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<HelpOffer>()
-                .HasOne(h => h.Helper)
+            // HelpOffer ↔ Member (도와주는 사람)
+            modelBuilder.Entity<HelpOfferModel>()
+                .HasOne(h => h.HelperMember)
                 .WithMany(m => m.HelpOffers)
                 .HasForeignKey(h => h.HelperMemId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<HelpOffer>()
-                .HasOne(h => h.Requester)
+            // HelpOffer ↔ Member (도움 요청자)
+            modelBuilder.Entity<HelpOfferModel>()
+                .HasOne(h => h.RequestMember)
                 .WithMany()
                 .HasForeignKey(h => h.ReqMemId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<HelpOffer>()
-             .HasOne(h => h.ReserveCar)
-            .WithMany()
-            .HasForeignKey(h => h.ReserveCarId)
-            .OnDelete(DeleteBehavior.Cascade);
+                // HelpOffer ↔ MemberCar (예약 차량)
+            modelBuilder.Entity<HelpOfferModel>()
+                .HasOne(h => h.ReserveCar)
+                .WithMany()
+                .HasForeignKey(h => h.ReserveCarId)
+                .OnDelete(DeleteBehavior.SetNull);
+
         }
     }
 }

@@ -34,7 +34,7 @@ namespace ParkingHelp.DB.QueryCondition
         [DefaultValue("10저3519")]
         public string carNumber { get; set; } = string.Empty; // 차량 번호
 
-        public CarHelpStatus? Status { get; set; } // 차량 번호
+        public RequestHelpStatus? Status { get; set; } // 차량 번호
     }
 
     public class MemberUpdateParam

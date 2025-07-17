@@ -29,12 +29,12 @@ namespace ParkingHelp.Controllers
         {
             try
             {
-                DateTime nowKST = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul"));
-                DateTime startOfToday = nowKST.Date; //
-                DateTime endOfToday = startOfToday.AddDays(1).AddSeconds(-1);
+                DateTimeOffset nowKST = DateTimeOffset.UtcNow;
+                DateTimeOffset startOfToday = nowKST.Date; //
+                DateTimeOffset endOfToday = startOfToday.AddDays(1).AddSeconds(-1);
 
-                DateTime fromDate = query.FromReqDate ?? startOfToday;
-                DateTime toDate = query.ToReqDate ?? endOfToday;
+                DateTimeOffset fromDate = query.FromReqDate ?? startOfToday;
+                DateTimeOffset toDate = query.ToReqDate ?? endOfToday;
                 var reqHelps = await _context.ReqHelps
                     .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate)
                     .OrderBy(x => x.ReqDate).ToListAsync();
@@ -57,7 +57,7 @@ namespace ParkingHelp.Controllers
         {
             try
             {
-                var newHelpOffer = new HelpOffer
+                var newHelpOffer = new HelpOfferModel
                 {
 
                 };

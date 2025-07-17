@@ -29,31 +29,28 @@ namespace ParkingHelp.DB.QueryCondition
         /// </summary>
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         [DefaultValue(0)]
-        public CarHelpStatus? Status { get; set; }
+        public RequestHelpStatus? Status { get; set; }
 
         /// <summary>
         /// 요청날짜
         /// </summary>
         /// <param name="fromDate">조회 시작일 (기본값: 오늘 0시)</param>
         [SwaggerSchema("조회 시작일 (기본값: 오늘 00:00)", Format = "date-time")]
-        public DateTime? FromReqDate { get; set; }
+        public DateTimeOffset? FromReqDate { get; set; }
         [SwaggerSchema("조회 시작일 (기본값: 오늘 23:59)", Format = "date-time")]
         /// <summary>요청일 범위 끝</summary>
-        public DateTime? ToReqDate { get; set; }
+        public DateTimeOffset? ToReqDate { get; set; }
     }
 
     public class RequestHelpPostParam
     {
         /// <summary>도움 요청자 ID</summary>
         public int? HelpReqMemId { get; set; }
-        [SwaggerSchema("차량 고유ID", Format = "int")]
-        [DefaultValue(1)]
-        public int? CarId { get; set; }
-        /// <summary>
-        /// 요청 차량 번호
-        /// </summary>
-        [DefaultValue("사용안함 혹시몰라서 만든거 무시해도 됨")]
-        public string? CarNumber { get; set; }
+
+        public int TotalDisCount { get; set; }
+        [SwaggerSchema("요청상태값", Format = "int")]
+        [DefaultValue(0)]
+        public RequestHelpStatus RequestHelpStatus { get; set; }
     }
 
     public class RequestHelpPutParam
@@ -62,9 +59,21 @@ namespace ParkingHelp.DB.QueryCondition
         public int? HelperMemId { get; set; }
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         [DefaultValue(0)]
-        public CarHelpStatus? Status { get; set; }
-   
-        public DateTime? ConfirmDate { get; set; }
-        public DateTime? HelpDate { get; set; }// 도움 제공 날짜
+        public RequestHelpStatus? Status { get; set; }
+        [SwaggerSchema("요청 할인권 갯수", Format = "int")]
+        public int? DiscountTotalCount { get; set; }
+        [SwaggerSchema("적용 할인권 갯수", Format = "int")]
+        public int? DiscountApplyCount { get; set; }
+        public DateTimeOffset ReqDate { get; set; }
+        public List<RequestHelpDatailParam>? RequestHelpDetail { get; set; }
+    }
+
+    public class RequestHelpDatailParam
+    {
+        public int Id { get; set; }
+        public int Req_id { get; set; }
+        public ReqDetailStatus? Status { get; set; }
+        public DateTimeOffset? DiscountApplyDate { get; set; }
+        public int? DiscountApplyType { get; set; }
     }
 }

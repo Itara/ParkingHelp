@@ -5,6 +5,7 @@ using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pag
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
+using ParkingHelp.DTO;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
@@ -67,7 +68,7 @@ namespace ParkingHelp.Controllers
         {
             try
             {
-                var newMember = new Member
+                var newMember = new MemberModel
                 {
                     MemberLoginId = query.memberLoginId,
                     MemberName = query.memberName,
@@ -75,12 +76,12 @@ namespace ParkingHelp.Controllers
                 };
                 _context.Members.Add(newMember);
                 await _context.SaveChangesAsync();
-                var newCar = new MemberCar
+                var newCar = new MemberCarModel
                 {
                     CarNumber = query.carNumber,
                     MemberId = newMember.Id,
-                    CreateDate = DateTime.UtcNow,
-                    UpdateDate = DateTime.UtcNow
+                    CreateDate = DateTimeOffset.UtcNow,
+                    UpdateDate = DateTimeOffset.UtcNow
                 };
                 await _context.MemberCars.AddAsync(newCar);
                 await _context.SaveChangesAsync();
@@ -95,7 +96,21 @@ namespace ParkingHelp.Controllers
                         await _context.SaveChangesAsync();
                     }
                 }
-                return Ok(newMember);
+                MemberDto newMemberDto = new MemberDto
+                {
+                    Id = newMember.Id,
+                    Name = newMember.MemberName,
+                    Email = newMember.Email ?? "",
+                    MemberLoginId = newMember.MemberLoginId,
+                    SlackId = newMember.SlackId,
+                    Cars = newMember.Cars.Select(car => new MemberCarDTO
+                    {
+                        Id = car.Id,
+                        CarNumber = car.CarNumber
+                    }).ToList()
+                };
+
+                return Ok(newMemberDto);
             }
             catch (Exception ex)
             {
@@ -129,17 +144,17 @@ namespace ParkingHelp.Controllers
                 if (car != null)
                 {
                     car.CarNumber = query.carNumber;
-                    car.UpdateDate = DateTime.UtcNow;
+                    car.UpdateDate = DateTimeOffset.UtcNow;
                     _context.MemberCars.Update(car);
                 }
                 else
                 {
-                    var newCar = new MemberCar
+                    var newCar = new MemberCarModel
                     {
                         MemberId = member.Id,
                         CarNumber = query.carNumber,
-                        CreateDate = DateTime.UtcNow,
-                        UpdateDate = DateTime.UtcNow
+                        CreateDate = DateTimeOffset.UtcNow,
+                        UpdateDate = DateTimeOffset.UtcNow
                     };
                     await _context.MemberCars.AddAsync(newCar);
                 }

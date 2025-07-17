@@ -5,11 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
-using ParkingHelp.DTO;
 using ParkingHelp.DB.QueryCondition;
+using ParkingHelp.DTO;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 using System.Linq;
+using static ParkingHelp.DTO.HelpRequesterDto;
 namespace ParkingHelp.Controllers
 {
 
@@ -36,32 +37,23 @@ namespace ParkingHelp.Controllers
         {
             try
             {
-                TimeZoneInfo kstZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul");
+                var kstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul");
+                var nowKST = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, kstTimeZone);
+                var startOfTodayKST = new DateTimeOffset(nowKST.Date, kstTimeZone.GetUtcOffset(nowKST.Date));
+                var endOfTodayKST = startOfTodayKST.AddDays(1).AddSeconds(-1);
 
-                DateTime nowKST = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, kstZone);
-                DateTime startOfTodayKST = nowKST.Date; // 오늘 자정 (KST)
-                DateTime endOfTodayKST = startOfTodayKST.AddDays(1).AddSeconds(-1); // 오늘 23:59:59 (KST)
-
-                DateTime startUtc = TimeZoneInfo.ConvertTimeToUtc(startOfTodayKST, kstZone);
-                DateTime endUtc = TimeZoneInfo.ConvertTimeToUtc(endOfTodayKST, kstZone);
-
-                DateTime fromDate = query.FromReqDate ?? startUtc;
-                DateTime toDate = query.ToReqDate ?? endUtc;
+                DateTimeOffset fromDate = query.FromReqDate ?? startOfTodayKST;
+                DateTimeOffset toDate = query.ToReqDate ?? endOfTodayKST;
 
                 var reqHelpsQuery = _context.ReqHelps
-                    .Include(r => r.HelpRequester)
-                    .Include(r => r.Helper)
-                    .Include(r => r.ReqCar)
-                    .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate);
+                    .Include(r => r.HelpReqMember)
+                    .ThenInclude(m => m.Cars)
+                    .Include(r => r.HelpDetails)
+                   .Where(x => x.ReqDate >= fromDate.UtcDateTime && x.ReqDate <= toDate.UtcDateTime);
 
                 if (query.HelpReqMemId.HasValue)
                 {
-                    reqHelpsQuery = reqHelpsQuery.Where(r => r.HelpRequester.Id == query.HelpReqMemId);
-                }
-
-                if (query.HelperMemId.HasValue)
-                {
-                    reqHelpsQuery = reqHelpsQuery.Where(r => r.Helper != null && r.Helper.Id == query.HelperMemId);
+                    reqHelpsQuery = reqHelpsQuery.Where(r => r.HelpReqMember.Id == query.HelpReqMemId);
                 }
 
                 if (!string.IsNullOrEmpty(query.ReqCarNumber))
@@ -79,23 +71,29 @@ namespace ParkingHelp.Controllers
                 {
                     Id = r.Id,
                     ReqDate = r.ReqDate,
-                    HelpDate = r.HelpDate,
                     Status = r.Status,
+                    TotalDisCount = r.DiscountTotalCount,
+                    ApplyDisCount = r.DiscountApplyCount ?? 0,
                     HelpRequester = new HelpRequesterDto
                     {
-                        Id = r.HelpRequester.Id,
-                        HelpRequesterName = r.HelpRequester.MemberName
+                        Id = r.HelpReqMember.Id,
+                        HelpRequesterName = r.HelpReqMember.MemberName,
+                        RequesterEmail = r.HelpReqMember.Email,
+                        ReqHelpCar = new ReqHelpCarDto
+                        {
+                            Id = r.HelpReqMember.Cars.First().Id,
+                            CarNumber = r.HelpReqMember.Cars.First().CarNumber
+                        }
                     },
-                    Helper = r.Helper == null ? null : new HelperDto
+                    HelpDetails = r.HelpDetails
+                    .Select(d => new ReqHelpDetailDto
                     {
-                        Id = r.Helper.Id,
-                        HelperName = r.Helper.MemberName
-                    },
-                    ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
-                    {
-                        Id = r.ReqCar.Id,
-                        CarNumber = r.ReqCar.CarNumber
-                    }
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        InsertDate = d.InsertDate,
+                        SlackThreadTs = d.SlackThreadTs
+                    }).ToList()
                 })
                 .OrderBy(r => r.Status)
                 .ThenBy(r => r.ReqDate)
@@ -119,45 +117,61 @@ namespace ParkingHelp.Controllers
         {
             try
             {
-                var newReqHelp = new ReqHelp
+                var newReqHelp = new ReqHelpModel
                 {
                     HelpReqMemId = query.HelpReqMemId ?? 0,
                     Status = 0,
-                    ReqCarId = query.CarId,
-                    ReqDate = DateTime.UtcNow
+                    ReqDate = DateTimeOffset.UtcNow,
+                    DiscountTotalCount = query.TotalDisCount,
+                    DiscountApplyCount = 0
                 };
+              
                 _context.ReqHelps.Add(newReqHelp);
                 await _context.SaveChangesAsync();
 
+                List<ReqHelpDetailModel> reqHelpDetailModels = new List<ReqHelpDetailModel>();
+                for (int i = 0; i < query.TotalDisCount; i++)
+                {
+                    reqHelpDetailModels.Add(new ReqHelpDetailModel
+                    {
+                        Req_Id = newReqHelp.Id,
+                        InsertDate = DateTimeOffset.UtcNow,
+                        ReqDetailStatus = 0
+                    });
+                }
+                _context.ReqHelpsDetail.AddRange(reqHelpDetailModels);
+                await _context.SaveChangesAsync();
+
                 var returnNewReqHelps = await _context.ReqHelps
-                   .Include(r => r.HelpRequester)
-                   .Include(r => r.Helper)
-                   .Include(r => r.ReqCar)
+                    .Include(r => r.HelpReqMember)
+                    .ThenInclude(m => m.Cars)
+                    .Include(r => r.HelpDetails)
                    .Select(r => new ReqHelpDto
                    {
                        Id = r.Id,
                        ReqDate = r.ReqDate,
-                       HelpDate = r.HelpDate,
                        Status = r.Status,
+
                        HelpRequester = new HelpRequesterDto
                        {
-                           Id = r.HelpRequester.Id,
-                           HelpRequesterName = r.HelpRequester.MemberName,
-                           RequesterEmail = r.HelpRequester.Email,
-                           SlackId = r.HelpRequester.SlackId
+                           Id = r.HelpReqMember.Id,
+                           HelpRequesterName = r.HelpReqMember.MemberName,
+                           RequesterEmail = r.HelpReqMember.Email,
+                           ReqHelpCar = new ReqHelpCarDto
+                           {
+                               Id = r.HelpReqMember.Cars.First().Id,
+                               CarNumber = r.HelpReqMember.Cars.First().CarNumber
+                           }
                        },
-                       Helper = r.Helper == null ? null : new HelperDto
-                       {
-                           Id = r.Helper.Id,
-                           HelperName = r.Helper.MemberName,
-                           HelperEmail = r.Helper.Email,
-                           SlackId = r.Helper.SlackId
-                       },
-                       ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
-                       {
-                           Id = r.ReqCar.Id,
-                           CarNumber = r.ReqCar.CarNumber
-                       }
+                       HelpDetails = r.HelpDetails
+                    .Select(d => new ReqHelpDetailDto
+                    {
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        InsertDate = d.InsertDate,
+                        SlackThreadTs = d.SlackThreadTs
+                    }).ToList()
                    })
                    .Where(x => x.Id == newReqHelp.Id)
                    .ToListAsync();
@@ -166,7 +180,7 @@ namespace ParkingHelp.Controllers
                 string requestName = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.HelpRequesterName ?? "Unknown";
                 string requestEmail = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.RequesterEmail ?? "Unknown Email";
                 string requestSlackId = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.SlackId ?? "Unknown Slack ID";
-                string requestCarNumber = returnNewReqHelps.FirstOrDefault()?.ReqCar?.CarNumber ?? "Unknown Car Number";
+                string requestCarNumber = returnNewReqHelps.FirstOrDefault()?.HelpRequester.ReqHelpCar?.CarNumber ?? "Unknown Car Number";
 
                 if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
                 {
@@ -214,62 +228,85 @@ namespace ParkingHelp.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpPutParam query)
         {
-            var reqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == id);
+            var reqHelp = await _context.ReqHelps
+                .Include(r => r.HelpReqMember)
+                .ThenInclude(m => m.Cars)
+                .Include(r => r.HelpDetails).FirstOrDefaultAsync(x => x.Id == id);
 
             if (reqHelp == null)
             {
                 return NotFound("요청이 존재하지 않습니다.");
             }
-
             try
             {
-                reqHelp.Status = query.Status ?? reqHelp.Status;
-                reqHelp.HelperMemId = query.HelperMemId;
-                reqHelp.HelpDate = query.HelpDate ?? reqHelp.HelpDate;
-                reqHelp.ConfirmDate = query.ConfirmDate ?? reqHelp.ConfirmDate;
+                int requestTotalDisCountCount = reqHelp.DiscountTotalCount;
+                int applylDiscountCount = reqHelp.DiscountApplyCount ?? 0;
+                if (query.RequestHelpDetail != null)
+                {
+                    bool isRequestHelpFinish = false;
+                    foreach (RequestHelpDatailParam requestDetail in query.RequestHelpDetail)
+                    {
+                        var existingDetail = reqHelp.HelpDetails.FirstOrDefault(x => x.Id == requestDetail.Id);
+                        if (existingDetail != null)
+                        {
+                            existingDetail.DiscountApplyDate = requestDetail.DiscountApplyDate ?? existingDetail.DiscountApplyDate;
+                            existingDetail.ReqDetailStatus = requestDetail.Status ?? existingDetail.ReqDetailStatus;
+                            existingDetail.DiscountApplyType = requestDetail.DiscountApplyType ?? existingDetail.DiscountApplyType;
+                            if (existingDetail.ReqDetailStatus == ReqDetailStatus.Completed)
+                            {
+                                applylDiscountCount++;
+                            }
+                        }
+                    }
+                    isRequestHelpFinish = requestTotalDisCountCount == applylDiscountCount;
+                    reqHelp.Status = (requestTotalDisCountCount == applylDiscountCount)
+                    ? query.Status ?? reqHelp.Status
+                    : query.Status ?? reqHelp.Status;
+
+                    reqHelp.DiscountApplyCount = applylDiscountCount;
+                }
+
                 await _context.SaveChangesAsync();
 
                 var updateReqHelps = await _context.ReqHelps
-                   .Include(r => r.HelpRequester)
-                   .Include(r => r.Helper)
-                   .Include(r => r.ReqCar)
-                    .Select(r => new ReqHelpDto
+                .Where(r => r.Id == id)
+                .Include(r => r.HelpReqMember)
+                .Include(r => r.ReqCar)
+                .Include(r => r.HelpDetails)
+                .Select(r => new ReqHelpDto
+                {
+                    Id = r.Id,
+                    ReqDate = r.ReqDate,
+                    Status = r.Status,
+                    HelpRequester = new HelpRequesterDto
                     {
-                        Id = r.Id,
-                        ReqDate = r.ReqDate,
-                        HelpDate = r.HelpDate,
-                        Status = r.Status,
-                        HelpRequester = new HelpRequesterDto
+                        Id = r.HelpReqMember.Id,
+                        HelpRequesterName = r.HelpReqMember.MemberName,
+                        RequesterEmail = r.HelpReqMember.Email,
+                        SlackId = r.HelpReqMember.SlackId,
+                        ReqHelpCar = new ReqHelpCarDto
                         {
-                            Id = r.HelpRequester.Id,
-                            HelpRequesterName = r.HelpRequester.MemberName,
-                            SlackId = r.HelpRequester.SlackId,
-                            RequesterEmail = r.HelpRequester.Email
-                        },
-                        Helper = r.Helper == null ? null : new HelperDto
-                        {
-                            Id = r.Helper.Id,
-                            HelperName = r.Helper.MemberName,
-                            HelperEmail = r.Helper.Email,
-                            SlackId = r.Helper.SlackId
-                        },
-                        ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
-                        {
-                            Id = r.ReqCar.Id,
-                            CarNumber = r.ReqCar.CarNumber
+                            Id = r.HelpReqMember.Cars.First().Id,
+                            CarNumber = r.HelpReqMember.Cars.First().CarNumber
                         }
-                    }).Where(x => x.Id == id)
-                   .ToListAsync();
+                    }
+                   ,
+                    HelpDetails = r.HelpDetails.Select(d => new ReqHelpDetailDto
+                    {
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        InsertDate = d.InsertDate,
+                        SlackThreadTs = d.SlackThreadTs
+                    }).ToList()
+                })
+                .FirstOrDefaultAsync();
 
-                // 요청자 정보 추출
-                string requestName = updateReqHelps.FirstOrDefault()?.HelpRequester?.HelpRequesterName ?? "Unknown";
-                string requestEmail = updateReqHelps.FirstOrDefault()?.HelpRequester?.RequesterEmail ?? "Unknown Email";
-                string requestSlackId = updateReqHelps.FirstOrDefault()?.HelpRequester?.SlackId ?? "Unknown Slack ID";
-                string requestCarNumber = updateReqHelps.FirstOrDefault()?.ReqCar?.CarNumber ?? "Unknown Car Number";
-
-                string helperName = updateReqHelps.FirstOrDefault()?.Helper?.HelperName ?? "Unknown Helper";
-                string helperEmail = updateReqHelps.FirstOrDefault()?.Helper?.HelperEmail ?? "Unknown Helper Email";
-                string helperSlackId = updateReqHelps.FirstOrDefault()?.Helper?.SlackId ?? "Unknown Helper Slack ID";
+                        // 요청자 정보 추출
+                string requestName = updateReqHelps?.HelpRequester?.HelpRequesterName ?? "Unknown";
+                string requestEmail = updateReqHelps?.HelpRequester?.RequesterEmail ?? "Unknown Email";
+                string requestSlackId = updateReqHelps?.HelpRequester?.SlackId ?? "Unknown Slack ID";
+                string requestCarNumber = updateReqHelps?.HelpRequester.ReqHelpCar?.CarNumber ?? "Unknown Car Number";
 
                 if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
                 {
@@ -277,15 +314,6 @@ namespace ParkingHelp.Controllers
                     if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
                     {
                         requestSlackId = slackUser.Id;
-                    }
-                }
-
-                if ((string.IsNullOrEmpty(helperSlackId) || helperSlackId == "Unknown Helper Slack ID") && helperEmail != "Unknown Helper Email")
-                {
-                    SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(helperEmail);
-                    if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
-                    {
-                        helperSlackId = slackUser.Id;
                     }
                 }
 

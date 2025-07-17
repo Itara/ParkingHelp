@@ -8,8 +8,8 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("도움을 준 Member ID", Format = "int")]
         public int HelperMemId { get; set; }
         [SwaggerSchema("조회 시작 날짜", Format = "date-time")]
-        public DateTime? FromHelpDate { get; set; } 
+        public DateTimeOffset? FromHelpDate { get; set; } 
         [SwaggerSchema("조회 종료 날짜", Format = "date-time")]
-        public DateTime? ToHelpDate { get; set; }
+        public DateTimeOffset? ToHelpDate { get; set; }
     }
 }

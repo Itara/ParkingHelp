@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace ParkingHelp.Models
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum  CarHelpStatus
+    public enum  RequestHelpStatus
     {
         [EnumMember(Value = "Waiting (대기)")]
         Waiting = 0, // 대기
@@ -12,6 +12,20 @@ namespace ParkingHelp.Models
         Check = 1, // 주차요청도움 확인상태
         [EnumMember(Value = "Completed (주차등록완료)")]
         Completed = 2, // 주차등록완료
+    }
+    public enum ReqDetailStatus
+    {
+        [EnumMember(Value = "Waiting (대기)")]
+        Waiting = 0, // 대기
+        [EnumMember(Value = "Completed (주차등록완료)")]
+        Completed = 1, // 주차등록완료
+    }
+    public enum DiscountApplyType
+    {
+        [EnumMember(Value = "카페")]
+        Cafe = 0, 
+        [EnumMember(Value = "식당")]
+        Restaurant = 1, 
     }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum  RankingOrderType

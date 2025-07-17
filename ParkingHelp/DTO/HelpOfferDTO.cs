@@ -5,12 +5,12 @@ namespace ParkingHelp.DTO
     public class HelpOfferDTO
     {
         public int Id { get; set; }
-        public DateTime? HelpDate { get; set; }
+        public DateTimeOffset? HelpDate { get; set; }
         public HelpRequesterDto HelpRequester { get; set; } = null!;
-        public DateTime RequestDate { get; set; } 
+        public DateTimeOffset RequestDate { get; set; } 
         public HelperDto? Helper { get; set; }
         public HelpReserveCarDto? ReqCar { get; set; } = null!;
-        public CarHelpStatus? Status { get; set; }
+        public RequestHelpStatus? Status { get; set; }
     }
    
 

@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 namespace ParkingHelp.Models
 {
     [Table("member")]
-    public class Member
+    public class MemberModel
     {
         [Column("id")]
         public int Id { get; set; }
@@ -21,14 +21,14 @@ namespace ParkingHelp.Models
         public string Email { get; set; } = string.Empty;
         [Column("create_date")]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]  
-        public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset CreateDate { get; set; } = DateTimeOffset.UtcNow;
         [Column("slack_id")]
         public string? SlackId { get; set; }
 
-        public ICollection<MemberCar> Cars { get; set; } = new List<MemberCar>();
+        public ICollection<MemberCarModel> Cars { get; set; } = new List<MemberCarModel>();
         
-        public ICollection<ReqHelp> HelpRequests { get; set; } = new List<ReqHelp>();
+        public ICollection<ReqHelpModel> HelpRequests { get; set; } = new List<ReqHelpModel>();
         
-        public ICollection<HelpOffer> HelpOffers { get; set; } = new List<HelpOffer>();
+        public ICollection<HelpOfferModel> HelpOffers { get; set; } = new List<HelpOfferModel>();
     }
 }

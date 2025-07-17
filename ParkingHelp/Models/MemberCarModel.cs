@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 namespace ParkingHelp.Models
 {
     [Table("member_car")]
-    public class MemberCar
+    public class MemberCarModel
     {
         [Column("id")]
         public int Id { get; set; }
@@ -16,12 +16,12 @@ namespace ParkingHelp.Models
         [Column("car_number")]
         public string CarNumber { get; set; } = string.Empty;
         [Column("create_date")]
-        public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset CreateDate { get; set; } = DateTimeOffset.UtcNow;
         [Column("update_date")]
-        public DateTime UpdateDate { get; set; } = DateTime.UtcNow;
+        public DateTimeOffset UpdateDate { get; set; } = DateTimeOffset.UtcNow;
+        public MemberModel Member { get; set; } = null!;
         [JsonIgnore]
-        public Member Member { get; set; } = null!;
-        [JsonIgnore]
-        public ICollection<ReqHelp> ReqHelps { get; set; } = new List<ReqHelp>();
+        public ICollection<ReqHelpModel> ReqHelps { get; set; } = null!;
+        public ICollection<HelpOfferModel> HelpOffers { get; set; } = null!;
     }
 }
