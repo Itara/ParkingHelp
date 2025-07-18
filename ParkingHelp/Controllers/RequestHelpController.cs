@@ -380,7 +380,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpGet("HelpDetail/{RequestId}")]
+        [HttpGet("ReqHelpDetail/{RequestId}")]
         public async Task<IActionResult> GetRequestHelpDetail(int RequestId)
         {
             try
@@ -415,7 +415,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpPut("HelpDetail/{RequestDetailId}")]
+        [HttpPut("ReqHelpDetail/{RequestDetailId}")]
         public async Task<IActionResult> PutRequestHelpDetail(int RequestDetailId, [FromQuery] RequestHelpDetailPutParam param)
         {
             try
@@ -477,7 +477,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpDelete("HelpDetail/{RequestDetailId}")]
+        [HttpDelete("ReqHelpDetail/{RequestDetailId}")]
         public async Task<IActionResult> DelteRequestHelpDetail(int RequestDetailId)
         {
             try
