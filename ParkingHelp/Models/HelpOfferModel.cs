@@ -21,7 +21,7 @@ namespace ParkingHelp.Models
         [Column("status")]
         public RequestHelpStatus? Status { get; set; }
         [Column("insert_date")]
-        public DateTimeOffset InsertDate { get; set; }
+        public DateTimeOffset? InsertDate { get; set; }
 
         [ForeignKey("RequestMember")]
         [Column("req_mem_id")]
@@ -29,7 +29,7 @@ namespace ParkingHelp.Models
         public MemberModel RequestMember { get; set; }
 
         [Column("req_date")]
-        public DateTimeOffset ReqDate { get; set; }
+        public DateTimeOffset? ReqDate { get; set; }
 
         [Column("reserve_car_id")]
         [ForeignKey("ReserveCar")]
@@ -37,10 +37,14 @@ namespace ParkingHelp.Models
         public MemberCarModel? ReserveCar { get; set; } = null!;
 
         [Column("help_date")]
-        public DateTimeOffset HelpDate { get; set; }
+        public DateTimeOffset? HelpDate { get; set; }
         [Column("slack_thread_ts")]
         public string? SlackThreadTs { get; set; }
 
+        public ICollection<ReqHelpDetailModel> HelpDetails { get; set; } = new List<ReqHelpDetailModel>();
 
+
+        [Column("member_car_model_id")]
+        public int? MemberCarModelId { get; set; }
     }
 }

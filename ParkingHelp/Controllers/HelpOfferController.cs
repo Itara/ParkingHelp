@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
+using ParkingHelp.DTO;
 using ParkingHelp.Models;
 
 namespace ParkingHelp.Controllers
@@ -25,21 +26,46 @@ namespace ParkingHelp.Controllers
         /// <param name="query"></param>
         /// <returns></returns>
         [HttpGet()]
-        public async Task<IActionResult> GetHelpOfferList([FromQuery] RequestHelpGetParam query)
+        public async Task<IActionResult> GetHelpOfferList([FromQuery] HelpOfferParam query)
         {
             try
             {
-                DateTimeOffset nowKST = DateTimeOffset.UtcNow;
-                DateTimeOffset startOfToday = nowKST.Date; //
-                DateTimeOffset endOfToday = startOfToday.AddDays(1).AddSeconds(-1);
+                var kstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul");
+                var nowKST = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, kstTimeZone);
+                var startOfTodayKST = new DateTimeOffset(nowKST.Date, kstTimeZone.GetUtcOffset(nowKST.Date));
+                var endOfTodayKST = startOfTodayKST.AddDays(1).AddSeconds(-1);
 
-                DateTimeOffset fromDate = query.FromReqDate ?? startOfToday;
-                DateTimeOffset toDate = query.ToReqDate ?? endOfToday;
-                var reqHelps = await _context.ReqHelps
-                    .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate)
-                    .OrderBy(x => x.ReqDate).ToListAsync();
+                DateTimeOffset fromDate = query.FromReqDate ?? startOfTodayKST;
+                DateTimeOffset toDate = query.ToReqDate ?? endOfTodayKST;
 
-                return Ok(reqHelps);
+                var helpOfferList = await _context.HelpOffers
+                    .Include(h => h.HelperMember)
+                    .Include(h => h.RequestMember)
+                    .Include(h => h.ReserveCar)
+                    //.Where(x => x.ReqDate >= fromDate.UtcDateTime && x.ReqDate <= toDate.UtcDateTime)
+                    .Select(h => new HelpOfferDTO
+                    {
+                        Id = h.HelperMemId,
+                        HelpOfferDate = h.InsertDate,
+                        RequestDate = (h.ReqDate ?? DateTimeOffset.MinValue).ToUniversalTime(),
+                        Status = h.Status,
+                        HelpOffName = h.HelperMember.MemberName,
+
+                        HelpRequester = new HelpRequesterDto
+                        {
+                            Id = h.RequestMember.Id,
+                            HelpRequesterName = h.RequestMember.MemberName,
+                            RequesterEmail = h.RequestMember.Email,
+                            ReqHelpCar = h.ReserveCar != null ? new ReqHelpCarDto
+                            {
+                                Id = h.ReserveCar.Id,
+                                CarNumber = h.ReserveCar.CarNumber
+                            } : null
+                        },
+                    })
+                    .ToListAsync();
+
+                return Ok(helpOfferList);
             }
             catch (Exception ex)
             {

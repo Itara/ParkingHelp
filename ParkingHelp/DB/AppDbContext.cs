@@ -11,6 +11,7 @@ namespace ParkingHelp.DB
         public DbSet<ReqHelpModel> ReqHelps { get; set; }
         public DbSet<ReqHelpDetailModel> ReqHelpsDetail { get; set; }
         public DbSet<HelpOfferModel> HelpOffers { get; set; }
+        public DbSet<HelpOfferDetailModel> HelpOffersDetail { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // 테이블명 설정 ( PostgreSQL은 테이블 명을 소문자로 하는게 네이밍 규칙이라 소문자로 정의)
@@ -19,7 +20,8 @@ namespace ParkingHelp.DB
             modelBuilder.Entity<MemberCarModel>().ToTable("member_car");
             modelBuilder.Entity<ReqHelpModel>().ToTable("req_help");
             modelBuilder.Entity<ReqHelpDetailModel>().ToTable("req_help_detail");
-            modelBuilder.Entity<HelpOfferModel>().ToTable("help_offer"); // 
+            modelBuilder.Entity<HelpOfferModel>().ToTable("help_offer"); 
+            modelBuilder.Entity<HelpOfferDetailModel>().ToTable("help_offer_detail");
 
             //    // UTC DateTimeOffset 컨벤션 일괄 적용 -> Azure 시간 한국으로 일괄 설정함 (서버 및 DB모두)
             //foreach (var entity in modelBuilder.Model.GetEntityTypes())
