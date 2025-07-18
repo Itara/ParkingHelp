@@ -28,7 +28,9 @@ namespace ParkingHelp.Models
         public ICollection<MemberCarModel> Cars { get; set; } = new List<MemberCarModel>();
         
         public ICollection<ReqHelpModel> HelpRequests { get; set; } = new List<ReqHelpModel>();
-        
+
         public ICollection<HelpOfferModel> HelpOffers { get; set; } = new List<HelpOfferModel>();
+
+        public ICollection<ReqHelpDetailModel> ReqHelpDetailHelper { get; set; } = new List<ReqHelpDetailModel>();
     }
 }

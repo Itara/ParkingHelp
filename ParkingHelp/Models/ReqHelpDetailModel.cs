@@ -14,6 +14,8 @@ namespace ParkingHelp.Models
         public int Req_Id { get; set; }
         [Column("status")]
         public ReqDetailStatus ReqDetailStatus { get; set; }
+        [Column("helper_mem_id")]
+        public int? HelperMemberId { get; set; }
         [Column("discount_apply_date")]
         public DateTimeOffset? DiscountApplyDate { get; set; }
         [Column("discount_apply_type")]
@@ -24,5 +26,6 @@ namespace ParkingHelp.Models
         public string? SlackThreadTs { get;set; }
 
         public ReqHelpModel ReqHelps { get; set; } = null!;
+        public MemberModel? HelperMember { get; set; }
     }
 }

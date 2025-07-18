@@ -1,9 +1,13 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.BlazorIdentity.Pages.Manage;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
+using ParkingHelp.DTO;
+using System.Xml.Linq;
 
 namespace ParkingHelp.Controllers
 {
@@ -23,6 +27,7 @@ namespace ParkingHelp.Controllers
         public IActionResult LoginUser([FromBody] LoginParam query)
         {
             var member = _context.Members.Include(m => m.Cars).FirstOrDefault(x => x.MemberLoginId == query.MemberLoginId);
+          
             if (member == null)
             {
                 JObject result = new JObject
@@ -34,7 +39,20 @@ namespace ParkingHelp.Controllers
             }
             else
             {
-                return Ok(member);
+                MemberDto memberDto = new MemberDto
+                {
+                    Id = member.Id,
+                    Name = member.MemberName,
+                    Email = member.Email ?? "",
+                    MemberLoginId = member.MemberLoginId,
+                    SlackId = member.SlackId,
+                    Cars = member.Cars.Select(car => new MemberCarDTO
+                    {
+                        Id = car.Id,
+                        CarNumber = car.CarNumber
+                    }).ToList()
+                };
+                return Ok(memberDto);
             }
         }
     }

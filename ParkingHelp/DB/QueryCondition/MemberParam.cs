@@ -10,7 +10,7 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("로그인Id", Format = "string")]
         [DefaultValue("1054")]
         public string memberLoginId { get; set; } = string.Empty; // 회원 ID
-       [SwaggerSchema("사용자명", Format = "string")]
+        [SwaggerSchema("사용자명", Format = "string")]
         [DefaultValue("박주현")]
         public string memberName { get; set; } = string.Empty; // 회원명
         [SwaggerSchema("사용자 차량번호", Format = "string")]
@@ -24,17 +24,15 @@ namespace ParkingHelp.DB.QueryCondition
 
     public class MemberGetParam
     {
-       [SwaggerSchema("로그인Id", Format = "string")]
+        [SwaggerSchema("로그인Id", Format = "string")]
         [DefaultValue("1054")]
         public string memberLoginId { get; set; } = string.Empty; // 회원 ID
-       [SwaggerSchema("사용자명", Format = "string")]
+        [SwaggerSchema("사용자명", Format = "string")]
         [DefaultValue("박주현")]
         public string memberName { get; set; } = string.Empty; // 회원명
         [SwaggerSchema("사용자 차량번호", Format = "string")]
         [DefaultValue("10저3519")]
         public string carNumber { get; set; } = string.Empty; // 차량 번호
-
-        public RequestHelpStatus? Status { get; set; } // 차량 번호
     }
 
     public class MemberUpdateParam
@@ -50,10 +48,10 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("사용자 차량번호", Format = "string")]
         [DefaultValue("10저3519")]
         public string carNumber { get; set; } = string.Empty; // 차량 번호
-        
+
     }
 
-    public class  MemberDeleteParam
+    public class MemberDeleteParam
     {
         [SwaggerSchema("로그인Id", Format = "string")]
         [DefaultValue("1054")]

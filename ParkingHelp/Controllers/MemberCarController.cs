@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
+using ParkingHelp.DTO;
 using ParkingHelp.Models;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
@@ -35,6 +36,12 @@ namespace ParkingHelp.Controllers
                     : query.Where(m => m.MemberId == param.MemberId);
 
                 var result = await query.ToListAsync();
+                List<MemberCarDTO> memberCarDtos = result.Select(m => new MemberCarDTO
+                {
+                    Id = m.Id,
+                    CarNumber = m.CarNumber,
+                    MemberId = m.MemberId
+                }).ToList();
 
                 return Ok(result);
             }
@@ -51,7 +58,6 @@ namespace ParkingHelp.Controllers
         [HttpPost()]
         public async Task<IActionResult> AddMemberCar([FromBody] MemberCarPostParam param)
         {
-
             try
             {
                 var newCar = new MemberCarModel
@@ -63,7 +69,13 @@ namespace ParkingHelp.Controllers
                 };
                 await _context.MemberCars.AddAsync(newCar);
                 await _context.SaveChangesAsync();
-                return Ok(newCar);
+                MemberCarDTO memberCarDTO = new MemberCarDTO
+                {
+                    Id = newCar.Id,
+                    CarNumber = newCar.CarNumber,
+                    MemberId = newCar.MemberId
+                };
+                return Ok(memberCarDTO);
             }
             catch (Exception ex)
             {
