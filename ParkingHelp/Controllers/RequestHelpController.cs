@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.CodeAnalysis.Elfie.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
@@ -146,7 +147,7 @@ namespace ParkingHelp.Controllers
                        Id = r.Id,
                        ReqDate = r.ReqDate,
                        Status = r.Status,
-
+                       ApplyDisCount = 0,
                        HelpRequester = new HelpRequesterDto
                        {
                            Id = r.HelpReqMember.Id,
@@ -434,7 +435,15 @@ namespace ParkingHelp.Controllers
                     updateTarget.HelperMemberId = param.HelperMemId.HasValue ? param.HelperMemId : updateTarget.HelperMemberId;
                     updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
+                    updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
                     _context.ReqHelpsDetail.Update(updateTarget);
+
+                    if (updateTarget.ReqDetailStatus == ReqDetailStatus.Completed)
+                    {
+                        var updateReqHelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
+                        updateReqHelp.DiscountApplyCount = updateReqHelp.DiscountApplyCount == null ? 1 : updateReqHelp.DiscountApplyCount.Value + 1; //null이면 0과 동일하므로  
+                        _context.ReqHelps.Update(updateReqHelp);
+                    }
                     await _context.SaveChangesAsync();
                 }
 
@@ -477,49 +486,50 @@ namespace ParkingHelp.Controllers
 
                 if (_context.ReqHelpsDetail.Any(m => m.Id == RequestDetailId))
                 {
-                    
+
                     var deleteReqHelpDetail = _context.ReqHelpsDetail
                         .Include(r => r.ReqHelps)
                         .Include(r => r.HelperMember)
                         .Where(x => x.Id == RequestDetailId).First();
                     int reqId = deleteReqHelpDetail.Req_Id;
-                     
-                    _context.ReqHelpsDetail.RemoveRange(_context.ReqHelpsDetail.Where(m => m.Id == RequestDetailId)); //Delete
-                    await _context.SaveChangesAsync();
+                    _context.ReqHelpsDetail.Remove(deleteReqHelpDetail);
 
-                    var updateReqHelp = _context.ReqHelps.Where(x => x.Id == reqId).First();
+                    var updateReqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == reqId);
 
-                    updateReqHelp.DiscountTotalCount = updateReqHelp.DiscountTotalCount - 1;
-
-                    if (updateReqHelp.DiscountTotalCount < 1) //해당 요청이 만료되었으므로 삭제
+                    if (updateReqHelp != null)
                     {
-                        _context.ReqHelps.Remove(updateReqHelp);
-                        returnJob = new JObject
+                        updateReqHelp.DiscountTotalCount -= 1;
+
+                        if (updateReqHelp.DiscountTotalCount < 1)
                         {
-                            { "Result", "Success" },
-                            { "RequestDetail", "할인권 적용 요청이 0개이므로 해당 할인권적용 요청건은 삭제했습니다" },
-                            { "RemoveReqHelp", true }
-                        };
-                    }
-                    else
-                    {
-                        _context.ReqHelps.Update(updateReqHelp);
-                        returnJob = new JObject
+                            _context.ReqHelps.Remove(updateReqHelp);
+                            returnJob = new JObject
+                            {
+                                { "Result", "Success" },
+                                { "RequestDetail", "할인권 적용 요청이 0개이므로 해당 할인권적용 요청건은 삭제했습니다" },
+                                { "RemoveReqHelp", true }
+                            };
+                        }
+                        else
                         {
-                            { "Result", "Success" },
-                            { "RequestDetail", $"할인권 요청이 {updateReqHelp.DiscountTotalCount}개 남았습니다" },
-                            { "RemoveReqHelp", false }
-                        };
+                            _context.ReqHelps.Update(updateReqHelp);
+                            returnJob = new JObject
+                            {
+                                { "Result", "Success" },
+                                { "RequestDetail", $"할인권 요청이 {updateReqHelp.DiscountTotalCount}개 남았습니다" },
+                                { "RemoveReqHelp", false }
+                            };
+                        }
+
+                        await _context.SaveChangesAsync();
                     }
 
-                    await _context.SaveChangesAsync();
 
-                    
                     return Ok(returnJob.ToString());
                 }
                 else
                 {
-                    returnJob = GetErrorJobject("해당 ID값이 존재하지않습니다.","");
+                    returnJob = GetErrorJobject("해당 ID값이 존재하지않습니다.", "");
                     return NotFound(returnJob.ToString());
                 }
             }

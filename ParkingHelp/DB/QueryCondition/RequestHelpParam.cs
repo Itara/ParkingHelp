@@ -44,8 +44,7 @@ namespace ParkingHelp.DB.QueryCondition
 
     public class RequestHelpDetailParam
     {
-        [SwaggerSchema("도움요청자의 고유ID", Format = "string")]
-        public int? HelperMemId { get; set; }
+      
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         [DefaultValue(0)]
         public RequestHelpStatus? Status { get; set; }
@@ -61,6 +60,8 @@ namespace ParkingHelp.DB.QueryCondition
     {
         public int Id { get; set; }
         public int Req_id { get; set; }
+        [SwaggerSchema("도움요청자의 고유ID", Format = "int")]
+        public int? HelperMemId { get; set; }
         public ReqDetailStatus? Status { get; set; }
         public DateTimeOffset? DiscountApplyDate { get; set; }
         public DiscountApplyType? DiscountApplyType { get; set; }

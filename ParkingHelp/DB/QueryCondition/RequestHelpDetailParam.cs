@@ -6,6 +6,7 @@ namespace ParkingHelp.DB.QueryCondition
     {
         public DateTimeOffset? DisCountApplyDate { get; set; }
         public DiscountApplyType? DisCountApplyType { get; set; }
+        public ReqDetailStatus? ReqDetailStatus { get; set; }
         public int? HelperMemId { get; set; }
     }
 }
