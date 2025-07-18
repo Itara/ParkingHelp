@@ -8,17 +8,17 @@
 
     }
 
-    public class HelperStatsDto
+    public class HelperHistoryDto
     {
         public int? HelperId { get; set; }
         public string HelperName { get; set; } = string.Empty;
         public int HelpCount { get; set; }
         public DateTimeOffset? FirstHelpDate { get; set; }
         public DateTimeOffset? LastHelpDate { get; set; }
-        public List<RecentHelpDto> RecentHelps { get; set; } = new();
+        public List<HelpHistoryDto> RecentHelps { get; set; } = new();
     }
 
-    public class RecentHelpDto
+    public class HelpHistoryDto
     {
         public int ReqId { get; set; }
         public DateTimeOffset? InsertDate { get; set; }
