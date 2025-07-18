@@ -33,7 +33,13 @@ namespace ParkingHelp.Controllers
 
             try
             {
-                var query = _context.Members.AsQueryable();
+                var query = _context.Members
+                    .Include(m => m.Cars)
+                    .Include(m => m.HelpRequests)
+                    .ThenInclude(req => req.HelpDetails)
+                    .ThenInclude(detail => detail.HelperMember)
+                    .OrderBy(r => r.Id)
+                    .AsQueryable();
 
                 // 조건이 있는 것만 차례대로 붙임
                 query = string.IsNullOrWhiteSpace(param.memberLoginId)
@@ -48,8 +54,7 @@ namespace ParkingHelp.Controllers
                    ? query
                    : query.Where(m => m.Cars.Any(mc => mc.CarNumber.Contains(carNumber)));
 
-                var result = await query.Include(m => m.Cars)
-                    .OrderBy(r => r.Id).ToListAsync();
+                var result = await query.OrderBy(r => r.Id).ToListAsync();
                 List<MemberDto> memberDtos = result.Select(m => new MemberDto
                 {
                     Id = m.Id,
@@ -57,13 +62,47 @@ namespace ParkingHelp.Controllers
                     Email = m.Email ?? "",
                     MemberLoginId = m.MemberLoginId,
                     SlackId = m.SlackId,
+
                     Cars = m.Cars.Select(car => new MemberCarDTO
                     {
                         Id = car.Id,
                         CarNumber = car.CarNumber
+                    }).ToList(),
+                    RequestHelpHistory = m.HelpRequests?.Select(req => new ReqHelpDto
+                    {
+                        Id = req.Id,
+                        ApplyDisCount = req.DiscountApplyCount,
+                        TotalDisCount = req.DiscountTotalCount,
+                        Status = req.Status,
+                        ReqDate = req.ReqDate,
+                        HelpRequester = new HelpRequesterDto
+                        {
+                            Id = req.HelpReqMember.Id,
+                            HelpRequesterName = req.HelpReqMember.MemberName,
+                            RequesterEmail = req.HelpReqMember.Email,
+                            ReqHelpCar = new ReqHelpCarDto
+                            {
+                                Id = req.HelpReqMember.Cars.First().Id,
+                                CarNumber = req.HelpReqMember.Cars.First().CarNumber
+                            }
+                            
+                        },
+                        HelpDetails = req.HelpDetails.Select(detail => new ReqHelpDetailDto
+                        {
+                            Id = detail.Id,
+                            ReqDetailStatus = detail.ReqDetailStatus,
+                            Helper = detail.HelperMember == null ? null : new HelpMemberDto
+                            {
+                                Id = detail.HelperMemberId ?? 0,
+                                HelperName = detail.HelperMember?.MemberName ?? string.Empty,
+                                HelperEmail = detail.HelperMember?.Email ?? string.Empty,
+                                SlackId = detail.HelperMember?.SlackId ?? string.Empty
+                            },
+                            InsertDate = detail.InsertDate
+                        }).ToList()
                     }).ToList()
-                }).ToList();
-               
+                }).ToList(); 
+
                 return Ok(memberDtos);
             }
             catch (Exception ex)

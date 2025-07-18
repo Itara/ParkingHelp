@@ -56,11 +56,6 @@ namespace ParkingHelp.Controllers
                     reqHelpsQuery = reqHelpsQuery.Where(r => r.HelpReqMember.Id == query.HelpReqMemId);
                 }
 
-                if (!string.IsNullOrEmpty(query.ReqCarNumber))
-                {
-                    reqHelpsQuery = reqHelpsQuery.Where(r => r.ReqCar != null && r.ReqCar.CarNumber == query.ReqCarNumber);
-                }
-
                 if (query.Status.HasValue)
                 {
                     reqHelpsQuery = reqHelpsQuery.Where(r => r.Status == query.Status);
@@ -125,7 +120,7 @@ namespace ParkingHelp.Controllers
                     DiscountTotalCount = query.TotalDisCount,
                     DiscountApplyCount = 0
                 };
-              
+
                 _context.ReqHelps.Add(newReqHelp);
                 await _context.SaveChangesAsync();
 
@@ -226,7 +221,7 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpPutParam query)
+        public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpDetailParam query)
         {
             var reqHelp = await _context.ReqHelps
                 .Include(r => r.HelpReqMember)
@@ -302,7 +297,7 @@ namespace ParkingHelp.Controllers
                 })
                 .FirstOrDefaultAsync();
 
-                        // 요청자 정보 추출
+                // 요청자 정보 추출
                 string requestName = updateReqHelps?.HelpRequester?.HelpRequesterName ?? "Unknown";
                 string requestEmail = updateReqHelps?.HelpRequester?.RequesterEmail ?? "Unknown Email";
                 string requestSlackId = updateReqHelps?.HelpRequester?.SlackId ?? "Unknown Slack ID";
@@ -384,6 +379,156 @@ namespace ParkingHelp.Controllers
             }
         }
 
+        [HttpGet("HelpDetail/{RequestId}")]
+        public async Task<IActionResult> GetRequestHelpDetail(int RequestId)
+        {
+            try
+            {
+                var reqHelpDetail = await _context.ReqHelpsDetail
+                    .Include(r => r.ReqHelps)
+                    .Include(r => r.HelperMember)
+                    .Where(x => x.Req_Id == RequestId)
+                    .Select(r => new ReqHelpDetailDto
+                    {
+                        Id = r.Id,
+                        ReqDetailStatus = r.ReqDetailStatus,
+                        DiscountApplyDate = r.DiscountApplyDate,
+                        DiscountApplyType = r.DiscountApplyType,
+                        InsertDate = r.InsertDate,
+                        SlackThreadTs = r.SlackThreadTs,
+                        Helper = r.HelperMember == null ? null : new HelpMemberDto
+                        {
+                            Id = r.HelperMember.Id,
+                            HelperName = r.HelperMember.MemberName,
+                            HelperEmail = r.HelperMember.Email,
+                        },
+                    })
+                    .OrderBy(x => x.Id)
+                    .ToListAsync();
+                return Ok(reqHelpDetail);
+            }
+            catch (Exception ex)
+            {
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
+        }
+
+        [HttpPut("HelpDetail/{RequestDetailId}")]
+        public async Task<IActionResult> PutRequestHelpDetail(int RequestDetailId, [FromQuery] RequestHelpDetailPutParam param)
+        {
+            try
+            {
+                var updateTarget = await _context.ReqHelpsDetail
+                    .Include(r => r.ReqHelps)
+                    .Include(r => r.HelperMember)
+                    .FirstOrDefaultAsync(x => x.Id == RequestDetailId);
+
+                if (updateTarget == null)
+                {
+                    JObject jResult = GetErrorJobject($"id : {RequestDetailId} 값에 해당되는 요청 값이 없습니다 ", "");
+                    return NotFound(jResult.ToString());
+                }
+                else
+                {
+                    updateTarget.HelperMemberId = param.HelperMemId.HasValue ? param.HelperMemId : updateTarget.HelperMemberId;
+                    updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
+                    updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
+                    _context.ReqHelpsDetail.Update(updateTarget);
+                    await _context.SaveChangesAsync();
+                }
+
+                var reqHelpDetail = await _context.ReqHelpsDetail
+                .Include(r => r.ReqHelps)
+                .Include(r => r.HelperMember)
+                .Where(x => x.Id == RequestDetailId)
+                .Select(r => new ReqHelpDetailDto
+                {
+                    Id = r.Id,
+                    ReqDetailStatus = r.ReqDetailStatus,
+                    DiscountApplyDate = r.DiscountApplyDate,
+                    DiscountApplyType = r.DiscountApplyType,
+                    InsertDate = r.InsertDate,
+                    SlackThreadTs = r.SlackThreadTs,
+                    Helper = r.HelperMember == null ? null : new HelpMemberDto
+                    {
+                        Id = r.HelperMember.Id,
+                        HelperName = r.HelperMember.MemberName,
+                        HelperEmail = r.HelperMember.Email,
+                    },
+                })
+                .OrderBy(x => x.Id)
+                .ToListAsync();
+                return Ok(reqHelpDetail);
+            }
+            catch (Exception ex)
+            {
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
+        }
+
+        [HttpDelete("HelpDetail/{RequestDetailId}")]
+        public async Task<IActionResult> DelteRequestHelpDetail(int RequestDetailId)
+        {
+            try
+            {
+                JObject returnJob = new JObject();
+
+                if (_context.ReqHelpsDetail.Any(m => m.Id == RequestDetailId))
+                {
+                    
+                    var deleteReqHelpDetail = _context.ReqHelpsDetail
+                        .Include(r => r.ReqHelps)
+                        .Include(r => r.HelperMember)
+                        .Where(x => x.Id == RequestDetailId).First();
+                    int reqId = deleteReqHelpDetail.Req_Id;
+                     
+                    _context.ReqHelpsDetail.RemoveRange(_context.ReqHelpsDetail.Where(m => m.Id == RequestDetailId)); //Delete
+                    await _context.SaveChangesAsync();
+
+                    var updateReqHelp = _context.ReqHelps.Where(x => x.Id == reqId).First();
+
+                    updateReqHelp.DiscountTotalCount = updateReqHelp.DiscountTotalCount - 1;
+
+                    if (updateReqHelp.DiscountTotalCount < 1) //해당 요청이 만료되었으므로 삭제
+                    {
+                        _context.ReqHelps.Remove(updateReqHelp);
+                        returnJob = new JObject
+                        {
+                            { "Result", "Success" },
+                            { "RequestDetail", "할인권 적용 요청이 0개이므로 해당 할인권적용 요청건은 삭제했습니다" },
+                            { "RemoveReqHelp", true }
+                        };
+                    }
+                    else
+                    {
+                        _context.ReqHelps.Update(updateReqHelp);
+                        returnJob = new JObject
+                        {
+                            { "Result", "Success" },
+                            { "RequestDetail", $"할인권 요청이 {updateReqHelp.DiscountTotalCount}개 남았습니다" },
+                            { "RemoveReqHelp", false }
+                        };
+                    }
+
+                    await _context.SaveChangesAsync();
+
+                    
+                    return Ok(returnJob.ToString());
+                }
+                else
+                {
+                    returnJob = GetErrorJobject("해당 ID값이 존재하지않습니다.","");
+                    return NotFound(returnJob.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
+        }
         private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
         {
             return new JObject

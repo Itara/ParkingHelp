@@ -19,7 +19,7 @@ namespace ParkingHelp.Models
         [Column("discount_apply_date")]
         public DateTimeOffset? DiscountApplyDate { get; set; }
         [Column("discount_apply_type")]
-        public int DiscountApplyType { get; set; }
+        public DiscountApplyType DiscountApplyType { get; set; }
         [Column("insert_date")]
         public DateTimeOffset? InsertDate { get;set; }
         [Column("slack_thread_ts")]

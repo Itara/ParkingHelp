@@ -73,7 +73,7 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPut("HelpOffer/{id}")]
-        public async Task<IActionResult> PutHelpOffer(int id, [FromBody] RequestHelpPutParam query)
+        public async Task<IActionResult> PutHelpOffer(int id, [FromBody] RequestHelpDetailParam query)
         {
             var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
 

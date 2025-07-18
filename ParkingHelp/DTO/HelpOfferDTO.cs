@@ -8,7 +8,7 @@ namespace ParkingHelp.DTO
         public DateTimeOffset? HelpDate { get; set; }
         public HelpRequesterDto HelpRequester { get; set; } = null!;
         public DateTimeOffset RequestDate { get; set; } 
-        public HelperDto? Helper { get; set; }
+        public HelpMemberDto? Helper { get; set; }
         public HelpReserveCarDto? ReqCar { get; set; } = null!;
         public RequestHelpStatus? Status { get; set; }
     }

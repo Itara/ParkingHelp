@@ -2,7 +2,7 @@
 
 namespace ParkingHelp.DTO
 {
-    public class HelperDto
+    public class HelpMemberDto
     {
         public int Id { get; set; }
         public string HelperName { get; set; } = string.Empty;
@@ -11,7 +11,6 @@ namespace ParkingHelp.DTO
     }
     public class HelpRequesterDto
     {
-        
         public int Id { get; set; }
         public string HelpRequesterName { get; set; } = string.Empty;
         public string? RequesterEmail { get; set; } = string.Empty;

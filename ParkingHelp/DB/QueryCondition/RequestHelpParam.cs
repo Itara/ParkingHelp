@@ -13,17 +13,6 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("도움 요청자 고유Id", Format = "int")]
         [DefaultValue(1)]
         public int? HelpReqMemId { get; set; }
-
-        /// <summary>도움을 제공한 사용자 ID</summary>
-        [SwaggerSchema("주차 등록해줄사람 고유Id", Format = "int")]
-        [DefaultValue(1)]
-        public int? HelperMemId { get; set; }
-
-        /// <summary>요청 차량 ID</summary>
-        [SwaggerSchema("차량번호", Format = "string")]
-        [DefaultValue("10저3519")]
-        public string? ReqCarNumber { get; set; }
-
         /// <summary>
         /// 요청상태
         /// </summary>
@@ -44,18 +33,18 @@ namespace ParkingHelp.DB.QueryCondition
 
     public class RequestHelpPostParam
     {
-        /// <summary>도움 요청자 ID</summary>
+        [SwaggerSchema("도움요청자의 고유ID", Format = "string")]
         public int? HelpReqMemId { get; set; }
-
+        [SwaggerSchema("할인요청 갯수", Format = "string")]
         public int TotalDisCount { get; set; }
         [SwaggerSchema("요청상태값", Format = "int")]
         [DefaultValue(0)]
         public RequestHelpStatus RequestHelpStatus { get; set; }
     }
 
-    public class RequestHelpPutParam
+    public class RequestHelpDetailParam
     {
-        /// <summary>도움을 제공한 사용자 ID</summary>
+        [SwaggerSchema("도움요청자의 고유ID", Format = "string")]
         public int? HelperMemId { get; set; }
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         [DefaultValue(0)]
@@ -74,6 +63,6 @@ namespace ParkingHelp.DB.QueryCondition
         public int Req_id { get; set; }
         public ReqDetailStatus? Status { get; set; }
         public DateTimeOffset? DiscountApplyDate { get; set; }
-        public int? DiscountApplyType { get; set; }
+        public DiscountApplyType? DiscountApplyType { get; set; }
     }
 }

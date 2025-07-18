@@ -8,6 +8,7 @@
         public string? Email { get; set; }
         public string? SlackId { get; set; }
         public List<MemberCarDTO>? Cars { get; set; }
+        public List<ReqHelpDto>? RequestHelpHistory { get; set; } //Login할때 기본적으로 가져올 자신의 요청내역
 
     }
 

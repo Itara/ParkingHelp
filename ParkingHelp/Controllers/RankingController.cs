@@ -29,7 +29,7 @@ namespace ParkingHelp.Controllers
             var today = DateTimeOffset.Now;
             var startOfMonth = new DateTimeOffset(today.Year, today.Month, 1, 0, 0, 0, today.Offset);
             var endOfMonth = startOfMonth.AddMonths(1);  // 다음 달 1일
-          
+
             try
             {
                 DateTimeOffset fromDate = param.FromDate ?? startOfMonth;
@@ -59,7 +59,7 @@ namespace ParkingHelp.Controllers
                     Count = g.Count()
                 });
                 // 1 + 2 합계
-                var combinedStats = reqHelpStats.Concat(helpOfferStats).GroupBy(x => x.MemberId)
+                var combinedStats = helpOfferStats.Concat(helpOfferStats).GroupBy(x => x.MemberId)
                     .Select(g => new
                     {
                         MemberId = g.Key,
