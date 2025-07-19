@@ -92,7 +92,14 @@ namespace ParkingHelp.Controllers
                         ReqDetailStatus = d.ReqDetailStatus,
                         DiscountApplyDate = d.DiscountApplyDate,
                         InsertDate = d.InsertDate,
-                        SlackThreadTs = d.SlackThreadTs
+                        SlackThreadTs = d.SlackThreadTs,
+                        Helper = d.HelperMember == null ? null : new HelpMemberDto
+                        {
+                            Id = d.HelperMember.Id,
+                            Name = d.HelperMember.MemberName,
+                            Email = d.HelperMember.Email,
+                            SlackId = d.HelperMember.SlackId
+                        }
                     }).ToList()
                 })
                 .OrderBy(r => r.Status)
@@ -285,7 +292,7 @@ namespace ParkingHelp.Controllers
 
                     reqHelp.Status = query.Status ?? reqHelp.Status;
                 }
-
+                reqHelp.DiscountApplyCount = applylDiscountCount;
                 await _context.SaveChangesAsync();
 
                 var updateReqHelps = await _context.ReqHelps
@@ -320,6 +327,13 @@ namespace ParkingHelp.Controllers
                         DiscountApplyDate = d.DiscountApplyDate,
                         DiscountApplyType = d.DiscountApplyType,
                         InsertDate = d.InsertDate,
+                        Helper = d.HelperMember == null ? null : new HelpMemberDto
+                        {
+                            Id = d.HelperMember.Id,
+                            Name = d.HelperMember.MemberName,
+                            Email = d.HelperMember.Email,
+                            SlackId = d.HelperMember.SlackId
+                        },
                         SlackThreadTs = d.SlackThreadTs
                     }).ToList()
                 })
