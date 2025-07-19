@@ -261,6 +261,10 @@ namespace ParkingHelp.Controllers
                                 applylDiscountCount++;
                                 existingDetail.DiscountApplyDate = DateTimeOffset.UtcNow;
                             }
+                            else if (existingDetail.ReqDetailStatus == ReqDetailStatus.Waiting && existingDetail.HelperMemberId.HasValue && existingDetail.HelperMemberId != 0)
+                            {
+                                existingDetail.ReqDetailStatus = ReqDetailStatus.Check;
+                            }
                         }
                     }
 
