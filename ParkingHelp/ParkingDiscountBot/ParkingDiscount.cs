@@ -184,7 +184,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         jobReturn = new JObject
                         {
                             ["Result"] = "Fail",
-                            ["ReturnMessage"] = "차량번호가 2개 이상입니다.",
+                            ["ReturnMessage"] = $"{carNumber}로 조회한 차량번호가 2개 이상입니다.",
                             ["CarList"] = new JObject
                             {
                                 ["CarNumbers"] = new JArray(carNoList)
