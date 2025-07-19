@@ -1,4 +1,5 @@
-﻿using ParkingHelp.Models;
+﻿using ParkingHelp.DTO;
+using ParkingHelp.Models;
 using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel;
 
@@ -44,17 +45,17 @@ namespace ParkingHelp.DB.QueryCondition
         /// <summary>도움을 요청한 사람</summary>
         public int? HelpMemId { get; set; }
         /// <summary>대기 누른 시간</summary>
-        public DateTime? HelpDate { get; set; }
+        //public DateTime? HelpDate { get; set; }
 
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         //[DefaultValue(0)]
         public HelpStatus? Status { get; set; }
 
         /// <summary>차 번호</summary>
-        public string? CarNumber { get; set; }
+        //public string? CarNumber { get; set; }
 
         /// <summary>완료 누른시간</summary>
-        public DateTime? ConfirmDate { get; set; }
+        //public DateTime? ConfirmDate { get; set; }
         public List<HelpOfferDetailPutParam>? HelpOfferDetail { get; set; }
     }
 
@@ -76,6 +77,10 @@ namespace ParkingHelp.DB.QueryCondition
         public ReqDetailStatus? Status { get; set; }
         public DateTimeOffset? DiscountApplyDate { get; set; }
         public DiscountApplyType? DiscountApplyType { get; set; }
-        public List<HelpOfferDetailParam>? HelpOfferDetail { get; set; }
+        //public List<HelpOfferDetailParam>? HelpOfferDetail { get; set; }
+        public DateTimeOffset? RequestDate { get; set; }
+        public ReqHelpCarDto? ReqHelpCar { get; set; }
+
+
     }
 }

@@ -208,7 +208,7 @@ namespace ParkingHelp.Controllers
                 var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    helpOffer.HelerServiceDate = query.HelpDate ?? helpOffer.HelerServiceDate;
+                    helpOffer.HelerServiceDate = helpOffer.HelerServiceDate;
                     helpOffer.Status = query.Status ?? helpOffer.Status;
 
                     var detailIds = query.HelpOfferDetail?.Select(x => x.Id).ToHashSet() ?? new HashSet<int>();
@@ -220,6 +220,11 @@ namespace ParkingHelp.Controllers
                         {
                             if (!existingDetails.TryGetValue(detail.Id, out var existing))
                                 continue;
+
+                            if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
+                            {
+                                existing.RequestMemberId = query.HelpMemId.Value;
+                            }
 
                             var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
 
@@ -233,6 +238,10 @@ namespace ParkingHelp.Controllers
                             else if (detail.DiscountApplyDate.HasValue)
                             {
                                 existing.DiscountApplyDate = detail.DiscountApplyDate;
+                            }
+                            if (detail.RequestDate.HasValue)
+                            {
+                                existing.RequestDate = detail.RequestDate.Value;
                             }
                         }
                     }
@@ -332,6 +341,54 @@ namespace ParkingHelp.Controllers
                 return BadRequest(jResult.ToString());
             }
         }
+
+        [HttpGet("HelpOfferDetail")]
+        public async Task<IActionResult> GetHelpOfferDetail([FromQuery] int helpOfferId)
+        {
+            try
+            {
+                var helpDetails = await _context.HelpOffersDetail
+                    .Where(h => h.HelpOfferId == helpOfferId)
+                    .Include(h => h.RequestMember)
+                    .ThenInclude(h => h.Cars)
+                    .ToListAsync();
+
+                var detailDtos = helpDetails.Select(d => new HelpOfferDetailDTO
+                {
+                    Id = d.Id,
+                    ReqDetailStatus = d.ReqDetailStatus,
+                    DiscountApplyDate = d.DiscountApplyDate,
+                    DiscountApplyType = d.DiscountApplyType,
+                    RequestDate = d.RequestDate,
+                    HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                    {
+                        Id = d.RequestMember.Id,
+                        HelpRequesterName = d.RequestMember.MemberName,
+                        RequesterEmail = d.RequestMember.Email,
+                        SlackId = d.RequestMember.SlackId,
+                        ReqHelpCar = d.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                        {
+                            Id = c.Id,
+                            CarNumber = c.CarNumber
+                        }).FirstOrDefault()
+                    }
+                }).ToList();
+
+                return Ok(detailDtos);
+            }
+            catch (Exception ex)
+            {
+                JObject result = new JObject
+        {
+            { "Result", "Fail" },
+            { "ErrMsg", ex.Message }
+        };
+                return BadRequest(result);
+            }
+        }
+
+
+
 
         private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
         {
