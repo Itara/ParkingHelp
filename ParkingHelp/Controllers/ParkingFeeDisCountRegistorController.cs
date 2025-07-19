@@ -22,8 +22,10 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPost()]
-        public async Task<IActionResult> PostDiscountParkingFee([FromBody] RequestHelpPostParam query)
+        public async Task<IActionResult> PostDiscountParkingFee([FromBody] ParkingDiscountFeePostParam query)
         {
+            ParkingDiscountBot.ParkingDiscount parkingDiscount = new ParkingDiscountBot.ParkingDiscount();
+            await parkingDiscount.RegisterParkingDiscountAsync(query.CarNumber);
             return BadRequest();
         }
     }

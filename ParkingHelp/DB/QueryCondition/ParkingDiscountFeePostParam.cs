@@ -5,5 +5,6 @@ namespace ParkingHelp.DB.QueryCondition
     public class ParkingDiscountFeePostParam
     {
         public int CarId {  get; set; }
+        public string CarNumber { get; set; } = string.Empty;
     }
 }
