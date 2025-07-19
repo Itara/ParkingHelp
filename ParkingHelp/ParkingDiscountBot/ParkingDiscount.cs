@@ -1,14 +1,26 @@
 ﻿using Microsoft.Playwright;
+using Newtonsoft.Json.Linq;
+using NuGet.ProjectModel;
+using ParkingHelp.SlackBot;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace ParkingHelp.ParkingDiscountBot
 {
     public class ParkingDiscount
     {
-
-        public async Task<bool> RegisterParkingDiscountAsync(string carNumber)
+        private readonly SlackNotifier SlackNotifier;
+        public ParkingDiscount(SlackNotifier _slackNotifier)
         {
-
+            SlackNotifier = _slackNotifier;
+        }
+        public async Task<JObject> RegisterParkingDiscountAsync(string carNumber,bool notifySlackChannel = false)
+        {
+            JObject jobReturn = new JObject
+            {
+                ["Result"] = "Fail",
+                ["ReturnMessage"] = "Unknown Error"
+            };
             try
             {
                 using var playwright = await Playwright.CreateAsync();
@@ -49,15 +61,16 @@ namespace ParkingHelp.ParkingDiscountBot
                 if (row != null)
                 {
                     var carNoSpans = await page.Locator("table#searchDataTable span").AllInnerTextsAsync();
-                    string carNum = "";
+                    List<string> carNoList = new List<string>();
                     foreach (var carNo in carNoSpans)
                     {
                         Console.WriteLine($"차량번호: {carNo}");
-                        carNum = carNo;
-                        break;
+                        carNoList.Add(carNo);
                     }
-                    if (!string.IsNullOrEmpty(carNum))
+                    
+                    if (carNoList.Count == 1)
                     {
+                        string carNum = carNoList[0];
                         await page.WaitForSelectorAsync($"a:has-text('{carNum}')");
                         await page.ClickAsync($"a:has-text('{carNum}')");
 
@@ -73,23 +86,125 @@ namespace ParkingHelp.ParkingDiscountBot
                         // 4. 주차금액이 0보다 크면 방문자주차권 버튼 클릭
                         if (feeValue > 0)
                         {
-                            Console.WriteLine($"주차금액: {feeValue}원, 방문자 주차권 클릭 시도");
+                            var now = DateTime.Now;
+                            var today = now.DayOfWeek;
 
-                            // 버튼 id는 'add-discount-0' 으로 보임
-                            await page.ClickAsync("#add-discount-0");
+                            string? alertMessage = null;
+                            var dialogTcs = new TaskCompletionSource<IDialog>();
+                            page.Dialog += (_, dialog) =>
+                            {
+                                alertMessage = dialog.Message;
+                                dialog.AcceptAsync(); // 또는 AcceptAsync();
+                                dialogTcs.TrySetResult(dialog);
+                            };
+
+                            // 휴일 여부 판단 (일요일 or 공휴일)
+                            bool isHoliday = today == DayOfWeek.Sunday || today == DayOfWeek.Saturday;
+                            string discountButtonText = isHoliday ? "방문자주차권(휴일)" : "방문자주차권";
+
+                            var discountButton = page.Locator("#add-discount-0");
+
+                            if (isHoliday)
+                            {
+                                discountButton = page.Locator("#add-discount-1");
+                            }
+
+                            if (await discountButton.IsVisibleAsync())
+                            {
+                                Console.WriteLine($"할인권을 적용합니다!");
+                                await discountButton.ClickAsync();
+
+                                // 3. 실제 Dialog가 나타날 때까지 기다림 (최대 3초)
+                                var dialogTask = dialogTcs.Task;
+                                if (await Task.WhenAny(dialogTask, Task.Delay(3000)) == dialogTask)
+                                {
+                                    var dialog = await dialogTask;
+                                }
+
+                                await page.WaitForFunctionAsync(
+                                @"() => {
+                                    const el = document.querySelector('#realFee');
+                                    if (!el) return false;
+                                    const value = el.value.replace(/[^\d]/g, '');
+                                    return parseInt(value) === 0;
+                                }", null, new() { Timeout = 5000 });
+
+
+                                // 금액 다시 확인
+                                string feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
+                                int feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
+                                Console.WriteLine($"할인권 적용 후 주차금액: {feeValueAfter}원");
+
+                                jobReturn["Result"] = "OK";
+                                jobReturn["ReturnMessage"] = $"할인권 적용 후 주차금액: {feeValueAfter}원";
+
+                            }
+                            else
+                            {
+                                Console.WriteLine("ID '#add-discount-0' 버튼이 존재하지 않음. 텍스트로 재시도");
+
+                                // 텍스트 기반 선택자 fallback
+                                var fallbackButton = page.Locator($"button:has-text('{discountButtonText}')");
+                                if (await fallbackButton.IsVisibleAsync())
+                                {
+                                    Console.WriteLine("텍스트 기반 방문자주차권 버튼 존재. 클릭 시도.");
+                                    await fallbackButton.ClickAsync();
+
+                                    jobReturn["Result"] = "OK";
+                                    jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
+                                    Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
+                                }
+                                else
+                                {
+                                    Console.WriteLine("방문자주차권 버튼을 찾을 수 없습니다.");
+                                    jobReturn["Result"] = "Fail";
+                                    jobReturn["ReturnMessage"] = "방문자주차권 버튼을 찾을 수 없습니다.";
+                                }
+                            }
                         }
                         else
                         {
+                            jobReturn["Result"] = "OK";
+                            jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
                             Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
                         }
+
+                        if (notifySlackChannel && jobReturn["Result"]!.ToString() == "OK")
+                        {
+                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다.{jobReturn["ReturnMessage"]}", null); 
+                        }
+                    }
+                    else if (carNoList.Count > 1)
+                    {
+                        jobReturn = new JObject
+                        {
+                            ["Result"] = "Fail",
+                            ["ReturnMessage"] = "차량번호가 2개 이상입니다.",
+                            ["CarList"] = new JObject
+                            {
+                                ["CarNumbers"] = new JArray(carNoList)
+                            }
+                        };
+                    }
+                    else if(carNoList.Count < 1)
+                    {
+                        jobReturn = new JObject
+                        {
+                            ["Result"] = "Fail",
+                            ["ReturnMessage"] = "조회된 차량이 없습니다.",
+                            ["CarList"] = new JObject
+                            {
+                                ["CarNumbers"] = new JArray(carNoList)
+                            }
+                        };
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"{ex.Message}");
+                jobReturn["ReturnMessage"] = ex.Message;   
             }
-            return true;
+            return jobReturn;
         }
     }
 }

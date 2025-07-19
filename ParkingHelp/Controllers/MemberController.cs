@@ -33,7 +33,7 @@ namespace ParkingHelp.Controllers
 
             try
             {
-                var memberDtos =await _context.Members.Where(m =>
+                var memberDtos = await _context.Members.Where(m =>
                     (string.IsNullOrWhiteSpace(param.memberLoginId) || m.MemberLoginId.Contains(param.memberLoginId)) &&
                     (string.IsNullOrWhiteSpace(param.memberName) || m.MemberName.Contains(param.memberName)) &&
                     (string.IsNullOrWhiteSpace(param.carNumber) || m.Cars.Any(c => c.CarNumber.Contains(param.carNumber)))
@@ -213,39 +213,46 @@ namespace ParkingHelp.Controllers
                 return BadRequest(returnJob.ToString());
             }
 
-            if (!string.IsNullOrWhiteSpace(query.carNumber))
+            try
             {
-                var car = member.Cars.FirstOrDefault();
-                if (car != null)
+                member.Email = query.Email ?? member.Email;
+                member.MemberName = query.MemberName ?? member.MemberName;
+                _context.Members.Update(member);
+
+                if (!string.IsNullOrWhiteSpace(query.carNumber))
                 {
-                    car.CarNumber = query.carNumber;
-                    car.UpdateDate = DateTimeOffset.UtcNow;
-                    _context.MemberCars.Update(car);
-                }
-                else
-                {
-                    var newCar = new MemberCarModel
+                    var car = member.Cars.FirstOrDefault();
+                    if (car != null)
                     {
-                        MemberId = member.Id,
-                        CarNumber = query.carNumber,
-                        CreateDate = DateTimeOffset.UtcNow,
-                        UpdateDate = DateTimeOffset.UtcNow
-                    };
-                    await _context.MemberCars.AddAsync(newCar);
+                        car.CarNumber = query.carNumber;
+                        car.UpdateDate = DateTimeOffset.UtcNow;
+                        _context.MemberCars.Update(car);
+                    }
                 }
+
+                await _context.SaveChangesAsync();
+
+                var memberDTO = new MemberDto
+                {
+                    Id = member.Id,
+                    MemberLoginId = member.MemberLoginId,
+                    Email = member.Email,
+                    Cars = member.Cars.Select(x => new MemberCarDTO
+                    {
+                        Id = x.Id,
+                        CarNumber = x.CarNumber,
+                        MemberId = x.MemberId
+                    }).ToList()
+                };
+
+                return Ok(memberDTO);
             }
-
-            _context.Members.Update(member);
-            await _context.SaveChangesAsync();
-
-            returnJob = new JObject
+            catch (Exception ex)
             {
-                { "Result", "Success" },
-                { "MemberId", member.Id }
-            };
-            return Ok(returnJob.ToString());
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
         }
-
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteMember(int id)

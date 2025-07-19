@@ -22,10 +22,12 @@ namespace ParkingHelp.Models
     }
     public enum DiscountApplyType
     {
+        [EnumMember(Value = "적용안됨")]
+        None = 0,
         [EnumMember(Value = "카페")]
-        Cafe = 0, 
+        Cafe = 1 ,
         [EnumMember(Value = "식당")]
-        Restaurant = 1, 
+        Restaurant = 2, 
     }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum  RankingOrderType

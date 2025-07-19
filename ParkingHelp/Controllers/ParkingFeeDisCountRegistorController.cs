@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
 using NuGet.ProjectModel;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
@@ -24,8 +25,8 @@ namespace ParkingHelp.Controllers
         [HttpPost()]
         public async Task<IActionResult> PostDiscountParkingFee([FromBody] ParkingDiscountFeePostParam query)
         {
-            ParkingDiscountBot.ParkingDiscount parkingDiscount = new ParkingDiscountBot.ParkingDiscount();
-            await parkingDiscount.RegisterParkingDiscountAsync(query.CarNumber);
+            ParkingDiscountBot.ParkingDiscount parkingDiscount = new ParkingDiscountBot.ParkingDiscount(_slackNotifier);
+            JObject result = await parkingDiscount.RegisterParkingDiscountAsync(query.CarNumber,query.NotifySlackAlarm ?? false);
             return BadRequest();
         }
     }

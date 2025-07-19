@@ -44,7 +44,7 @@ namespace ParkingHelp.SlackBot
                 link_names = true,
                 thread_ts = string.IsNullOrEmpty(slackThreadTs) ? null : slackThreadTs
             };
-            
+            Console.WriteLine($"BotToken : {_botToken} , channel : {payload.channel} {payload.text}");
             var json = JsonConvert.SerializeObject(payload, new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Ignore
