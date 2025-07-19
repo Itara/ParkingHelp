@@ -15,7 +15,7 @@ namespace ParkingHelp.ParkingDiscountBot
         {
             SlackNotifier = _slackNotifier;
         }
-        public async Task<JObject> RegisterParkingDiscountAsync(string carNumber,bool notifySlackChannel = false)
+        public async Task<JObject> RegisterParkingDiscountAsync(string carNumber, bool notifySlackChannel = false)
         {
             JObject jobReturn = new JObject
             {
@@ -39,16 +39,15 @@ namespace ParkingHelp.ParkingDiscountBot
                         "--disable-background-timer-throttling",
                         "--disable-renderer-backgrounding"
                     }
-
                 });
 
                 var context = await browser.NewContextAsync();
                 var page = await context.NewPageAsync();
 
                 Console.WriteLine("로그인 페이지 이동 중...");
-                await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new PageGotoOptions
+                await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
                 {
-                    Timeout = 60000
+                    WaitUntil = WaitUntilState.NetworkIdle
                 });
 
                 // 입력 대기 후 아이디, 비밀번호 채우기
@@ -79,7 +78,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         Console.WriteLine($"차량번호: {carNo}");
                         carNoList.Add(carNo);
                     }
-                    
+
                     if (carNoList.Count == 1)
                     {
                         string carNum = carNoList[0];
@@ -106,7 +105,7 @@ namespace ParkingHelp.ParkingDiscountBot
                             page.Dialog += (_, dialog) =>
                             {
                                 alertMessage = dialog.Message;
-                                dialog.AcceptAsync(); 
+                                dialog.AcceptAsync();
                                 dialogTcs.TrySetResult(dialog);
                             };
 
@@ -127,7 +126,7 @@ namespace ParkingHelp.ParkingDiscountBot
                                 await discountButton.ClickAsync();
 
                                 // 3. 실제 Dialog가 나타날 때까지 기다림 (최대 3초)
-                                var dialogTask =dialogTcs.Task;
+                                var dialogTask = dialogTcs.Task;
                                 if (await Task.WhenAny(dialogTask, Task.Delay(5000)) == dialogTask)
                                 {
                                     var dialog = await dialogTask;
@@ -181,13 +180,13 @@ namespace ParkingHelp.ParkingDiscountBot
                         {
                             jobReturn["Result"] = "OK";
                             jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
-                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}]는 주차요금이 0원입니다. " , null);
+                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}]는 주차요금이 0원입니다. ", null);
                             Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
                         }
 
                         if (notifySlackChannel && jobReturn["Result"]!.ToString() == "OK")
                         {
-                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다.{jobReturn["ReturnMessage"]}", null); 
+                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다.{jobReturn["ReturnMessage"]}", null);
                         }
                     }
                     else if (carNoList.Count > 1)
@@ -202,7 +201,7 @@ namespace ParkingHelp.ParkingDiscountBot
                             }
                         };
                     }
-                    else if(carNoList.Count < 1)
+                    else if (carNoList.Count < 1)
                     {
                         jobReturn = new JObject
                         {
@@ -214,7 +213,7 @@ namespace ParkingHelp.ParkingDiscountBot
             }
             catch (Exception ex)
             {
-                jobReturn["ReturnMessage"] = ex.Message;   
+                jobReturn["ReturnMessage"] = ex.Message;
             }
             return jobReturn;
         }
