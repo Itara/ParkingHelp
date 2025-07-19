@@ -46,10 +46,7 @@ namespace ParkingHelp.DB.QueryCondition
         [DefaultValue(0)]
         public HelpStatus? Status { get; set; }
         [SwaggerSchema("요청 할인권 갯수", Format = "int")]
-        public int? DiscountTotalCount { get; set; }
-        [SwaggerSchema("적용 할인권 갯수", Format = "int")]
         public int? DiscountApplyCount { get; set; }
-        public DateTimeOffset ReqDate { get; set; }
         public List<RequestHelpDatailParam>? RequestHelpDetail { get; set; }
     }
 

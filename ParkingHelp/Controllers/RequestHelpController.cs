@@ -246,12 +246,14 @@ namespace ParkingHelp.Controllers
                         var existingDetail = reqHelp.HelpDetails.FirstOrDefault(x => x.Id == requestDetail.Id);
                         if (existingDetail != null)
                         {
+                            existingDetail.HelperMemberId = requestDetail.HelperMemId ?? existingDetail.HelperMemberId;
                             existingDetail.DiscountApplyDate = requestDetail.DiscountApplyDate ?? existingDetail.DiscountApplyDate;
                             existingDetail.ReqDetailStatus = requestDetail.Status ?? existingDetail.ReqDetailStatus;
                             existingDetail.DiscountApplyType = requestDetail.DiscountApplyType ?? existingDetail.DiscountApplyType;
                             if (existingDetail.ReqDetailStatus == ReqDetailStatus.Completed)
                             {
                                 applylDiscountCount++;
+                                existingDetail.DiscountApplyDate = DateTimeOffset.UtcNow;
                             }
                         }
                     }
