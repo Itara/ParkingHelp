@@ -11,13 +11,11 @@ namespace ParkingHelp.DB.QueryCondition
     {
         /// <summary>도움 요청자 ID</summary>
         [SwaggerSchema("도움 요청자 고유Id", Format = "int")]
-        [DefaultValue(1)]
         public int? HelpReqMemId { get; set; }
         /// <summary>
         /// 요청상태
         /// </summary>
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
-        [DefaultValue(0)]
         public HelpStatus? Status { get; set; }
         [SwaggerSchema("요청내역 하위 상태 조회", Format = "int")]
         public ReqDetailStatus? ReqDetailStatus { get; set; }
@@ -51,9 +49,7 @@ namespace ParkingHelp.DB.QueryCondition
 
     public class RequestHelpDetailParam
     {
-      
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
-        [DefaultValue(0)]
         public HelpStatus? Status { get; set; }
         [SwaggerSchema("요청 할인권 갯수", Format = "int")]
         public int? DiscountApplyCount { get; set; }

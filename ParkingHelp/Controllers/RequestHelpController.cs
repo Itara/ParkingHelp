@@ -277,7 +277,7 @@ namespace ParkingHelp.Controllers
 
                     reqHelp.DiscountApplyCount = applylDiscountCount;
 
-                    if (requestTotalDisCountCount == applylDiscountCount)
+                    if (requestTotalDisCountCount <= applylDiscountCount)
                     {
                         reqHelp.Status = HelpStatus.Completed;
                     }
@@ -294,7 +294,7 @@ namespace ParkingHelp.Controllers
                 }
                 reqHelp.DiscountApplyCount = applylDiscountCount;
                 reqHelp.DiscountApplyCount = query.DiscountApplyCount ?? reqHelp.DiscountApplyCount;
-
+                _context.ReqHelps.Update(reqHelp);
 
                 await _context.SaveChangesAsync();
 
