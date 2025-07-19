@@ -17,8 +17,10 @@ namespace ParkingHelp.Models
     {
         [EnumMember(Value = "Waiting (대기)")]
         Waiting = 0, // 대기
+        [EnumMember(Value = "Check (확인)")]
+        Check = 1, // 대기
         [EnumMember(Value = "Completed (주차등록완료)")]
-        Completed = 1, // 주차등록완료
+        Completed = 2, // 주차등록완료
     }
     public enum DiscountApplyType
     {
