@@ -293,7 +293,7 @@ namespace ParkingHelp.Controllers
                     reqHelp.Status = query.Status ?? reqHelp.Status;
                 }
                 reqHelp.DiscountApplyCount = applylDiscountCount;
-                reqHelp.DiscountApplyCount = query.DiscountApplyCount ?? reqHelp.DiscountApplyCount;
+                
 
  
                 await _context.SaveChangesAsync();
