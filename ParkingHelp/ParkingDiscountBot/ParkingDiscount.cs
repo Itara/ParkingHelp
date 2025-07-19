@@ -28,7 +28,18 @@ namespace ParkingHelp.ParkingDiscountBot
                 var browser = await playwright.Chromium.LaunchAsync(new()
                 {
                     Headless = true,
-                    SlowMo = 100
+                    SlowMo = 50,
+                    Args = new[]
+                    {
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-gpu",
+                        "--disable-dev-shm-usage",
+                        "--disable-background-networking",
+                        "--disable-background-timer-throttling",
+                        "--disable-renderer-backgrounding"
+                    }
+
                 });
 
                 var context = await browser.NewContextAsync();
