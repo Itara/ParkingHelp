@@ -124,8 +124,8 @@ namespace ParkingHelp.Controllers
 
                 _context.ReqHelps.Add(newReqHelp);
                 await _context.SaveChangesAsync();
-
-                List<ReqHelpDetailModel> reqHelpDetailModels = new List<ReqHelpDetailModel>();
+                
+                List<ReqHelpDetailModel> reqHelpDetailModels = new();
                 for (int i = 0; i < query.TotalDisCount; i++)
                 {
                     reqHelpDetailModels.Add(new ReqHelpDetailModel
@@ -135,7 +135,10 @@ namespace ParkingHelp.Controllers
                         ReqDetailStatus = 0
                     });
                 }
+
                 _context.ReqHelpsDetail.AddRange(reqHelpDetailModels);
+            
+                
                 await _context.SaveChangesAsync();
 
                 var returnNewReqHelps = await _context.ReqHelps
@@ -190,11 +193,11 @@ namespace ParkingHelp.Controllers
                 JObject? resultSlaclSendMessage = null;
                 if (requestSlackId != "Unknown Slack ID")
                 {
-                    resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"<@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                   // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"<@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
                 }
                 else
                 {
-                    resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                   // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
                 }
 
                 if (resultSlaclSendMessage != null && Convert.ToBoolean(resultSlaclSendMessage["ok"])) // 슬랙 메시지 전송 성공시
@@ -223,7 +226,7 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpDetailParam query)
+        public async Task<IActionResult> PutRequestHelp(int id, [FromBody] RequestHelpPutParam query)
         {
             var reqHelp = await _context.ReqHelps
                 .Include(r => r.HelpReqMember)
@@ -241,7 +244,7 @@ namespace ParkingHelp.Controllers
                 if (query.RequestHelpDetail != null)
                 {
                     bool isRequestHelpFinish = false;
-                    foreach (RequestHelpDatailParam requestDetail in query.RequestHelpDetail)
+                    foreach (RequestHelpDatailPutParam requestDetail in query.RequestHelpDetail)
                     {
                         var existingDetail = reqHelp.HelpDetails.FirstOrDefault(x => x.Id == requestDetail.Id);
                         if (existingDetail != null)
@@ -257,11 +260,21 @@ namespace ParkingHelp.Controllers
                             }
                         }
                     }
+                    
                     isRequestHelpFinish = requestTotalDisCountCount == applylDiscountCount;
-                    reqHelp.Status = (requestTotalDisCountCount == applylDiscountCount)
-                    ? query.Status ?? reqHelp.Status
-                    : query.Status ?? reqHelp.Status;
-
+                    if (isRequestHelpFinish)
+                    {
+                        reqHelp.Status = HelpStatus.Completed;
+                    }
+                    else if(applylDiscountCount > 0)
+                    {
+                        reqHelp.Status = HelpStatus.Check;
+                    }
+                    else
+                    {
+                        reqHelp.Status =HelpStatus.Waiting;
+                    }
+                    reqHelp.Status = query.Status ?? reqHelp.Status;
                     reqHelp.DiscountApplyCount = applylDiscountCount;
                 }
 
@@ -277,6 +290,8 @@ namespace ParkingHelp.Controllers
                     Id = r.Id,
                     ReqDate = r.ReqDate,
                     Status = r.Status,
+                    ApplyDisCount = r.DiscountApplyCount,
+                    TotalDisCount = r.DiscountTotalCount,
                     HelpRequester = new HelpRequesterDto
                     {
                         Id = r.HelpReqMember.Id,
