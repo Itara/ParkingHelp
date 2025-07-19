@@ -20,8 +20,5 @@ namespace ParkingHelp.Models
         [Column("update_date")]
         public DateTimeOffset UpdateDate { get; set; } = DateTimeOffset.UtcNow;
         public MemberModel Member { get; set; } = null!;
-        [JsonIgnore]
-        public ICollection<ReqHelpModel> ReqHelps { get; set; } = null!;
-        public ICollection<HelpOfferModel> HelpOffers { get; set; } = null!;
     }
 }

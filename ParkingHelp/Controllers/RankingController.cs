@@ -41,9 +41,9 @@ namespace ParkingHelp.Controllers
                 {
                     HelperId = d.HelpOffer.HelperMember.Id,
                     HelperName = d.HelpOffer.HelperMember.MemberName,
-                    RequestMemberId = d.RequestMember.Id,
+                    RequestMemberId = d.RequestMember!.Id,
                     DiscountApplyType = d.DiscountApplyType,
-                    DiscountApplyDate = d.DiscountApplyDate.Value,
+                    DiscountApplyDate = d.DiscountApplyDate!.Value,
                     ReqId = d.Id
                 })
                 .ToListAsync();
@@ -82,11 +82,11 @@ namespace ParkingHelp.Controllers
                             && d.ReqHelps.HelpReqMember != null)
                 .Select(d => new
                 {
-                    HelperId = d.HelperMember.Id,
+                    HelperId = d.HelperMember!.Id,
                     HelperName = d.HelperMember.MemberName,
                     RequestMemberId = d.ReqHelps.HelpReqMember.Id,
                     DiscountApplyType = d.DiscountApplyType,
-                    DiscountApplyDate = d.DiscountApplyDate.Value,
+                    DiscountApplyDate = d.DiscountApplyDate!.Value,
                     ReqId = d.Id
                 })
                 .ToListAsync();

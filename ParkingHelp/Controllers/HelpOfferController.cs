@@ -87,17 +87,86 @@ namespace ParkingHelp.Controllers
         {
             try
             {
+                int helpReqMemId = query.HelpReqMemId ?? 0;
+                var member =  await _context.Members.Where(x => x.Id  == helpReqMemId).FirstOrDefaultAsync();
+
+                if (helpReqMemId == 0 || member == null  )
+                {
+                    JObject jResult = GetErrorJobject("사용자를 찾을수없습니다.","");
+                    return BadRequest(jResult.ToString());
+                }
+
                 var newHelpOffer = new HelpOfferModel
                 {
-
+                    HelperMemId = query.HelpReqMemId!.Value,
+                    Status = HelpStatus.Waiting,
+                    HelerServiceDate = DateTimeOffset.UtcNow,
+                    DiscountTotalCount = query.TotalDisCount,
+                    DiscountApplyCount = 0
                 };
+
                 _context.HelpOffers.Add(newHelpOffer);
                 await _context.SaveChangesAsync();
-                return Ok(newHelpOffer);
+                for (int i= 0; i < query.TotalDisCount; i++)
+                {
+                    _context.HelpOffersDetail.Add(new HelpOfferDetailModel
+                    {
+                        HelpOfferId = newHelpOffer.Id,
+                        ReqDetailStatus = ReqDetailStatus.Waiting
+                    });
+                }
+                await _context.SaveChangesAsync();
+
+
+                // navigation 로딩
+                await _context.Entry(newHelpOffer).Reference(h => h.HelperMember).LoadAsync();
+                await _context.Entry(newHelpOffer).Collection(h => h.HelpDetails)
+                    .Query().Include(d => d.RequestMember).ThenInclude(m => m.Cars).LoadAsync();
+
+                // DTO로 매핑
+                var newHelperOfferDto = new HelpOfferDTO
+                {
+                    Id = newHelpOffer.Id,
+                    Status = newHelpOffer.Status,
+                    HelperServiceDate = newHelpOffer.HelerServiceDate,
+                    DiscountTotalCount = newHelpOffer.DiscountTotalCount,
+                    DiscountApplyCount = newHelpOffer.DiscountApplyCount,
+                    SlackThreadTs = newHelpOffer.SlackThreadTs,
+                    Helper = new HelpMemberDto
+                    {
+                        Id = newHelpOffer.HelperMember.Id,
+                        Name = newHelpOffer.HelperMember.MemberName,
+                        Email = newHelpOffer.HelperMember.Email,
+                        SlackId = newHelpOffer.HelperMember.SlackId
+                    },
+                    HelpOfferDetail = newHelpOffer.HelpDetails.Select(d => new HelpOfferDetailDTO
+                    {
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        DiscountApplyType = d.DiscountApplyType,
+                        RequestDate = d.RequestDate,
+                        HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                        {
+                            Id = d.RequestMember.Id,
+                            HelpRequesterName = d.RequestMember.MemberName,
+                            RequesterEmail = d.RequestMember.Email,
+                            SlackId = d.RequestMember.SlackId,
+                            ReqHelpCar = d.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                            {
+                                Id = c.Id,
+                                CarNumber = c.CarNumber
+                            }).FirstOrDefault()
+                        }
+                    }).ToList()
+                };
+
+
+                return Ok(newHelperOfferDto);
             }
             catch (Exception ex)
             {
-                JObject jResult = GetErrorJobject(ex.Message);
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
                 return BadRequest(jResult.ToString());
             }
         }
@@ -120,7 +189,7 @@ namespace ParkingHelp.Controllers
             }
             catch (Exception ex)
             {
-                JObject jResult = GetErrorJobject(ex.Message);
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
                 return BadRequest(jResult.ToString());
             }
         }
@@ -142,18 +211,18 @@ namespace ParkingHelp.Controllers
             }
             catch (Exception ex)
             {
-                JObject jResult = GetErrorJobject(ex.Message);
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
                 return BadRequest(jResult.ToString());
             }
         }
 
-
-        private JObject GetErrorJobject(string errorMessage)
+        private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
         {
             return new JObject
             {
                 { "Result", "Error" },
-                { "ErrorMsg", errorMessage }
+                { "ErrorMsg", errorMessage },
+                { "InnerException" , InnerExceptionMessage}
             };
         }
     }
