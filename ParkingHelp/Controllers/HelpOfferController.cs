@@ -186,80 +186,130 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutHelpOffer(int id, [FromBody] RequestHelpDetailParam query)
+        public async Task<IActionResult> PutHelpOffer(int id, [FromBody] HelpOfferPutParam query)
         {
-            var helpOffer = await _context.HelpOffers
-                .Include(h => h.HelperMember)
-                .Include(h => h.HelpDetails)
-                .FirstOrDefaultAsync(h => h.Id == id);
-
-            if (helpOffer == null)
-                return NotFound("요청이 존재하지 않습니다.");
+            if (query == null)
+                return BadRequest("요청 데이터가 없습니다.");
 
             try
             {
-                int totalCount = helpOffer.DiscountTotalCount;
-                int completedCount = helpOffer.DiscountApplyCount ?? 0;
+                var helpOffer = await _context.HelpOffers
+                    .Include(h => h.HelperMember)
+                    .ThenInclude(h => h.Cars)
+                    .Include(h => h.HelpDetails)
+                    .ThenInclude(d => d.RequestMember)
+                    .ThenInclude(m => m.Cars)
+                    .AsSplitQuery()
+                    .FirstOrDefaultAsync(h => h.Id == id);
 
-                if (query.RequestHelpDetail != null)
+                if (helpOffer == null)
+                    return NotFound("도움 요청이 존재하지 않습니다.");
+
+                var transaction = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    foreach (var detail in query.RequestHelpDetail)
-                    {
-                        var targetDetail = helpOffer.HelpDetails.FirstOrDefault(d => d.Id == detail.Id);
-                        if (targetDetail != null)
-                        {
-                            targetDetail.DiscountApplyDate = detail.DiscountApplyDate ?? targetDetail.DiscountApplyDate;
-                            targetDetail.ReqDetailStatus = detail.Status ?? targetDetail.ReqDetailStatus;
-                            targetDetail.DiscountApplyType = detail.DiscountApplyType ?? targetDetail.DiscountApplyType;
+                    helpOffer.HelerServiceDate = query.HelpDate ?? helpOffer.HelerServiceDate;
+                    helpOffer.Status = query.Status ?? helpOffer.Status;
 
-                            if (targetDetail.ReqDetailStatus == ReqDetailStatus.Completed)
+                    var detailIds = query.HelpOfferDetail?.Select(x => x.Id).ToHashSet() ?? new HashSet<int>();
+                    var existingDetails = helpOffer.HelpDetails.Where(d => detailIds.Contains(d.Id)).ToDictionary(d => d.Id);
+
+                    if (query.HelpOfferDetail != null)
+                    {
+                        foreach (var detail in query.HelpOfferDetail)
+                        {
+                            if (!existingDetails.TryGetValue(detail.Id, out var existing))
+                                continue;
+
+                            var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
+
+                            existing.ReqDetailStatus = detail.Status ?? existing.ReqDetailStatus;
+                            existing.DiscountApplyType = detail.DiscountApplyType ?? existing.DiscountApplyType;
+
+                            if (statusChanged && existing.ReqDetailStatus == ReqDetailStatus.Completed)
                             {
-                                completedCount++;
-                                targetDetail.DiscountApplyDate = DateTimeOffset.UtcNow;
+                                existing.DiscountApplyDate = DateTimeOffset.UtcNow;
                             }
-                                
+                            else if (detail.DiscountApplyDate.HasValue)
+                            {
+                                existing.DiscountApplyDate = detail.DiscountApplyDate;
+                            }
                         }
                     }
 
-                    helpOffer.Status = (completedCount == totalCount) ? query.Status ?? helpOffer.Status : helpOffer.Status;
+                    var completedCount = helpOffer.HelpDetails.Count(d => d.ReqDetailStatus == ReqDetailStatus.Completed);
                     helpOffer.DiscountApplyCount = completedCount;
-                }
-                await _context.SaveChangesAsync();
 
-                var updated = await _context.HelpOffers
-                    .Where(h => h.Id == id)
-                    .Include(h => h.HelperMember)
-                    .Include(h => h.HelpDetails)
-                    .Select(h => new HelpOfferDTO
+                    if (!query.Status.HasValue)
                     {
-                        Id = h.Id,
-                        Status = h.Status,
-                        HelperServiceDate = h.HelerServiceDate,
+                        if (helpOffer.DiscountApplyCount == helpOffer.DiscountTotalCount)
+                        {
+                            helpOffer.Status = HelpStatus.Completed;
+                        }
+                        else if (helpOffer.DiscountApplyCount > 0)
+                        {
+                            helpOffer.Status = HelpStatus.Check;
+                        }
+                        else
+                        {
+                            helpOffer.Status = HelpStatus.Waiting;
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    var updatedDto = new HelpOfferDTO
+                    {
+                        Id = helpOffer.Id,
+                        Status = helpOffer.Status,
+                        HelperServiceDate = helpOffer.HelerServiceDate,
+                        DiscountTotalCount = helpOffer.DiscountTotalCount,
+                        DiscountApplyCount = helpOffer.DiscountApplyCount,
+                        SlackThreadTs = helpOffer.SlackThreadTs,
                         Helper = new HelpMemberDto
                         {
-                            Id = h.HelperMember.Id,
-                            Name = h.HelperMember.MemberName,
-                            Email = h.HelperMember.Email,
-                            SlackId = h.HelperMember.SlackId
+                            Id = helpOffer.HelperMember.Id,
+                            Name = helpOffer.HelperMember.MemberName,
+                            Email = helpOffer.HelperMember.Email,
+                            SlackId = helpOffer.HelperMember.SlackId
                         },
-                        HelpOfferDetail = h.HelpDetails.Select(d => new HelpOfferDetailDTO
+                        HelpOfferDetail = helpOffer.HelpDetails.Select(d => new HelpOfferDetailDTO
                         {
                             Id = d.Id,
                             ReqDetailStatus = d.ReqDetailStatus,
                             DiscountApplyDate = d.DiscountApplyDate,
-                            DiscountApplyType = d.DiscountApplyType
+                            DiscountApplyType = d.DiscountApplyType,
+                            RequestDate = d.RequestDate,
+                            HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                            {
+                                Id = d.RequestMember.Id,
+                                HelpRequesterName = d.RequestMember.MemberName,
+                                RequesterEmail = d.RequestMember.Email,
+                                SlackId = d.RequestMember.SlackId,
+                                ReqHelpCar = d.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                                {
+                                    Id = c.Id,
+                                    CarNumber = c.CarNumber
+                                }).FirstOrDefault()
+                            }
                         }).ToList()
-                    })
-                    .FirstOrDefaultAsync();
+                    };
 
-                return Ok(updated);
+                    return Ok(updatedDto);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
             }
             catch (Exception ex)
             {
-                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
-                return BadRequest(jResult.ToString());
+                return BadRequest(GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null"));
             }
         }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRequestHelp(int id)
         {
