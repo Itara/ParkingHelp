@@ -32,65 +32,144 @@ namespace ParkingHelp.Controllers
 
             try
             {
-                DateTimeOffset fromDate = param.FromDate ?? startOfMonth;
-                DateTimeOffset toDate = param.ToDate ?? endOfMonth;
-                //1.도와주세요 통계
-                var helperStats = await _context.ReqHelpsDetail
-               .Where(r => r.HelperMemberId != null)
-               .GroupBy(r => new { r.HelperMemberId, r.HelperMember!.MemberName })
-               .Select(g => new
-               {
-                   HelperId = g.Key.HelperMemberId,
-                   HelperName = g.Key.MemberName,
-                   HelpCount = g.Count(),
-                   FirstHelpDate = g.Min(x => x.InsertDate),
-                   LastHelpDate = g.Max(x => x.InsertDate),
-                   RecentHelps = g.OrderByDescending(x => x.InsertDate).Take(3).ToList()
-               })
-               .OrderByDescending(x => x.HelpCount)
-               .ToListAsync();
-                //2.도와줄수있어요 통계
-                var helpOfferStats = _context.HelpOffers
-                //.Where(h => h.Status == CarHelpStatus.Completed && h.Requester != null)
-                .GroupBy(h => h.HelperMemId)
-                .Select(g => new
+                var helpOfferData = await _context.HelpOffersDetail
+                .Where(d => d.ReqDetailStatus == ReqDetailStatus.Completed
+                            && d.HelpOffer.HelperMember != null
+                            && d.RequestMember != null
+                            && d.DiscountApplyDate != null)
+                .Select(d => new
                 {
-                    MemberId = g.Key,
-                    Count = g.Count()
-                });
-                // 1 + 2 합계
-                var combinedStats = helpOfferStats.Concat(helpOfferStats).GroupBy(x => x.MemberId)
+                    HelperId = d.HelpOffer.HelperMember.Id,
+                    HelperName = d.HelpOffer.HelperMember.MemberName,
+                    RequestMemberId = d.RequestMember.Id,
+                    DiscountApplyType = d.DiscountApplyType,
+                    DiscountApplyDate = d.DiscountApplyDate.Value,
+                    ReqId = d.Id
+                })
+                .ToListAsync();
+
+                // 그룹핑 및 RankingDTO 변환
+                var rankingList = helpOfferData
+                    .GroupBy(d => new { d.HelperId, d.HelperName })
+                    .Select((g, index) => new RankingDTO
+                    {
+                        Id = g.Key.HelperId,
+                        MemberName = g.Key.HelperName,
+                        TotalHelpCount = g.Count(),
+                        Ranking = 0, // 일단 0으로 설정, 아래에서 순위 정렬
+                        HelpOfferHistoryDto = new HelperHistoryDto
+                        {
+                            HelperId = g.Key.HelperId,
+                            HelperName = g.Key.HelperName,
+                            HelpCount = g.Count(),
+                            HelpHistorys = g.Select(x => new HelpHistoryDto
+                            {
+                                ReqId = x.ReqId,
+                                HelpDate = x.DiscountApplyDate,
+                                RequestMemberId = x.RequestMemberId,
+                                DiscountApplyType = x.DiscountApplyType
+                            }).ToList()
+                        }
+                    })
+                    .OrderByDescending(r => r.TotalHelpCount)
+                    .ToList();
+
+
+                var reqHelpData = await _context.ReqHelpsDetail
+                .Where(d => d.ReqDetailStatus == ReqDetailStatus.Completed
+                            && d.HelperMember != null
+                            && d.DiscountApplyDate != null
+                            && d.ReqHelps.HelpReqMember != null)
+                .Select(d => new
+                {
+                    HelperId = d.HelperMember.Id,
+                    HelperName = d.HelperMember.MemberName,
+                    RequestMemberId = d.ReqHelps.HelpReqMember.Id,
+                    DiscountApplyType = d.DiscountApplyType,
+                    DiscountApplyDate = d.DiscountApplyDate.Value,
+                    ReqId = d.Id
+                })
+                .ToListAsync();
+
+                var reqGrouped = reqHelpData
+                    .GroupBy(d => new { d.HelperId, d.HelperName })
                     .Select(g => new
                     {
-                        MemberId = g.Key,
-                        TotalHelpCount = g.Sum(x => x.Count)
-                    });
-
-                // 정렬 + Join + Take
-                var query = combinedStats
-                    .Join
-                    (_context.Members, stat => stat.MemberId, mem => mem.Id,
-                        (stat, mem) => new RankingDTO
+                        HelperId = g.Key.HelperId,
+                        HelperName = g.Key.HelperName,
+                        HelpCount = g.Count(),
+                        HelpHistorys = g.Select(x => new HelpHistoryDto
                         {
-                            Id = mem.Id,
-                            MemberName = mem.MemberName,
-                            TotalHelpCount = stat.TotalHelpCount
-                        }
-                    );
+                            ReqId = x.ReqId,
+                            HelpDate = x.DiscountApplyDate,
+                            RequestMemberId = x.RequestMemberId,
+                            DiscountApplyType = x.DiscountApplyType
+                        }).ToList()
+                    })
+                    .ToList();
 
-                switch (param.OrderType)
+
+                foreach (var match in reqGrouped)
                 {
-                    case RankingOrderType.Ascending:
-                        query = query.OrderBy(x => x.TotalHelpCount);
-                        break;
-                    case RankingOrderType.Descending:
-                        query = query.OrderByDescending(x => x.TotalHelpCount);
-                        break;
+                    var existing = rankingList.FirstOrDefault(r => r.Id == match.HelperId);
+                    if (existing != null)
+                    {
+                        // 이미 존재하면 Req 도우미 이력만 추가
+                        existing.ReqestHelpHistoryDto = new HelperHistoryDto
+                        {
+                            HelperId = match.HelperId,
+                            HelperName = match.HelperName,
+                            HelpCount = match.HelpCount,
+                            HelpHistorys = match.HelpHistorys
+                        };
+                        existing.TotalHelpCount += match.HelpCount;
+                    }
+                    else
+                    {
+                        // 존재하지 않으면 새로 추가
+                        rankingList.Add(new RankingDTO
+                        {
+                            Id = match.HelperId,
+                            MemberName = match.HelperName,
+                            TotalHelpCount = match.HelpCount,
+                            Ranking = 0, // 나중에 정렬하면서 재계산
+                            ReqestHelpHistoryDto = new HelperHistoryDto
+                            {
+                                HelperId = match.HelperId,
+                                HelperName = match.HelperName,
+                                HelpCount = match.HelpCount,
+                                HelpHistorys = match.HelpHistorys
+                            },
+                            HelpOfferHistoryDto = null
+                        });
+                    }
                 }
 
-                var result = await query.Take(param.MaxCount ?? 5).ToListAsync();
+                var sorted = rankingList.OrderByDescending(r => r.TotalHelpCount).ToList();
 
-                return Ok(result);
+                int currentRank = 1;
+                int sameCount = 1;
+                int prevHelpCount = -1;
+
+                for (int i = 0; i < sorted.Count; i++)
+                {
+                    var r = sorted[i];
+                    if (r.TotalHelpCount == prevHelpCount)
+                    {
+                        r.Ranking = currentRank;
+                        sameCount++;
+                    }
+                    else
+                    {
+                        currentRank = i + 1;
+                        r.Ranking = currentRank;
+                        sameCount = 1;
+                        prevHelpCount = r.TotalHelpCount;
+                    }
+                }
+                List<RankingDTO> finalRankingList = sorted;
+
+                return Ok(finalRankingList);
             }
             catch (Exception ex)
             {
