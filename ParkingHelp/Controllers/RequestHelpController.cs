@@ -61,6 +61,10 @@ namespace ParkingHelp.Controllers
                 {
                     reqHelpsQuery = reqHelpsQuery.Where(r => r.Status == query.Status);
                 }
+                if(query.ReqDetailStatus.HasValue)
+                {
+                    reqHelpsQuery = reqHelpsQuery.Where(r => r.HelpDetails.Any(d => d.ReqDetailStatus == query.ReqDetailStatus));
+                }
 
                 var reqHelps = await reqHelpsQuery
                 .Select(r => new ReqHelpDto

@@ -19,7 +19,8 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         [DefaultValue(0)]
         public HelpStatus? Status { get; set; }
-
+        [SwaggerSchema("요청내역 하위 상태 조회", Format = "int")]
+        public ReqDetailStatus? ReqDetailStatus { get; set; }
         /// <summary>
         /// 요청날짜
         /// </summary>
@@ -45,6 +46,7 @@ namespace ParkingHelp.DB.QueryCondition
         [SwaggerSchema("요청 할인권 갯수", Format = "int")]
         public int? DiscountApplyCount { get; set; }
         public List<RequestHelpDatailPutParam>? RequestHelpDetail { get; set; }
+        
     }
 
     public class RequestHelpDetailParam
