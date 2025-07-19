@@ -35,41 +35,54 @@ namespace ParkingHelp.Controllers
                 var startOfTodayKST = new DateTimeOffset(nowKST.Date, kstTimeZone.GetUtcOffset(nowKST.Date));
                 var endOfTodayKST = startOfTodayKST.AddDays(1).AddSeconds(-1);
 
-                //DateTimeOffset fromDate = query.FromReqDate ?? startOfTodayKST;
-                //DateTimeOffset toDate = query.ToReqDate ?? endOfTodayKST;
+                DateTimeOffset fromDate = query.FromReqDate ?? startOfTodayKST;
+                DateTimeOffset toDate = query.ToReqDate ?? endOfTodayKST;
 
-                //var helpOfferList = await _context.HelpOffers
-                //    .Include(h => h.HelperMember)
-                //    .Include(h => h.RequestMember)
-                //    .Include(h => h.ReserveCar)
-                //    //.Where(x => x.ReqDate >= fromDate.UtcDateTime && x.ReqDate <= toDate.UtcDateTime)
-                //    .Select(h => new HelpOfferDTO
-                //    {
-                //        Id = h.HelperMemId,
-                //        HelpOfferDate = h.InsertDate,
-                //        RequestDate = (h.ReqDate ?? DateTimeOffset.MinValue).ToUniversalTime(),
-                //        Status = h.Status,
-                //        HelpOffName = h.HelperMember.MemberName,
+                var helpOfferList = await _context.HelpOffers
+                    .Include(h => h.HelperMember)
+                    .ThenInclude(m => m.Cars)
+                    .Include(r => r.HelpDetails)
+                    .Where(x => x.HelerServiceDate >= fromDate.UtcDateTime && x.HelerServiceDate <= toDate.UtcDateTime)
+                    .ToListAsync();
 
-                //        HelpRequester = new HelpRequesterDto
-                //        {
-                //            Id = h.RequestMember.Id,
-                //            HelpRequesterName = h.RequestMember.MemberName,
-                //            RequesterEmail = h.RequestMember.Email,
-                //            ReqHelpCar = h.ReserveCar != null ? new ReqHelpCarDto
-                //            {
-                //                Id = h.ReserveCar.Id,
-                //                CarNumber = h.ReserveCar.CarNumber
-                //            } : null
-                //        },
-                //    })
-                //    .ToListAsync();
-                JObject helpObject = new JObject
+                var reqhelpOfferListDto = helpOfferList.Select(h => new HelpOfferDTO
                 {
-                    { "Result", "Success" },
-                    { "Message", "도움 요청 리스트 조회 성공" }
-                };  
-                return Ok(helpObject.ToString());
+                    Id = h.Id,
+                    Status = h.Status,
+                    HelperServiceDate = h.HelerServiceDate,
+                    DiscountTotalCount = h.DiscountTotalCount,
+                    DiscountApplyCount = h.DiscountApplyCount,
+                    SlackThreadTs = h.SlackThreadTs,
+                    Helper = new HelpMemberDto
+                    {
+                        Id = h.HelperMember.Id,
+                        Name = h.HelperMember.MemberName,
+                        Email = h.HelperMember.Email,
+                        SlackId = h.HelperMember.SlackId
+                    },
+                    HelpOfferDetail = h.HelpDetails.Select(d => new HelpOfferDetailDTO
+                    {
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        DiscountApplyType = d.DiscountApplyType,
+                        RequestDate = d.RequestDate,
+                        HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                        {
+                            Id = d.RequestMember.Id,
+                            HelpRequesterName = d.RequestMember.MemberName,
+                            RequesterEmail = d.RequestMember.Email,
+                            SlackId = d.RequestMember.SlackId,
+                            ReqHelpCar = d.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                            {
+                                Id = c.Id,
+                                CarNumber = c.CarNumber
+                            }).FirstOrDefault()
+                        }
+                    }).ToList()
+                }).ToList();
+
+                return Ok(reqhelpOfferListDto);
             }
             catch (Exception ex)
             {
@@ -174,11 +187,16 @@ namespace ParkingHelp.Controllers
         [HttpPut("HelpOffer/{id}")]
         public async Task<IActionResult> PutHelpOffer(int id, [FromBody] RequestHelpDetailParam query)
         {
-            var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
+            //var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
+
+            var reqHelp = await _context.HelpOffers
+                .Include(r => r.HelperMember)
+                .ThenInclude(m => m.Cars)
+                .Include(r => r.HelpDetails).FirstOrDefaultAsync(x => x.Id == id);
 
             if (reqHelp == null)
             {
-                return NotFound("?? 존재하지 않습니다.");
+                return NotFound("요청이 존재하지 않습니다.");
             }
 
             try
