@@ -27,7 +27,27 @@ namespace ParkingHelp.Controllers
         {
             ParkingDiscountBot.ParkingDiscount parkingDiscount = new ParkingDiscountBot.ParkingDiscount(_slackNotifier);
             JObject result = await parkingDiscount.RegisterParkingDiscountAsync(query.CarNumber,query.NotifySlackAlarm ?? false);
-            return BadRequest();
+            if(result != null )
+            {
+                if(result["Result"].ToString() == "OK")
+                {
+                    return Ok(result.ToString());
+                }
+                else
+                {
+                    await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
+                    return BadRequest(result.ToString());
+                }
+            }
+            else
+            {
+                result = new JObject();
+                result.Add("Result", "Fail");
+                result.Add("ReturnMessage", "할인권 요청중 오류가 발생했습니다.");
+                await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
+                return BadRequest(result.ToString());
+            }
+                
         }
     }
     

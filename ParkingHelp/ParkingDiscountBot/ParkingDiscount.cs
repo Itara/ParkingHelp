@@ -1,4 +1,5 @@
-﻿using Microsoft.Playwright;
+﻿using log4net;
+using Microsoft.Playwright;
 using Newtonsoft.Json.Linq;
 using NuGet.ProjectModel;
 using ParkingHelp.SlackBot;
@@ -89,12 +90,12 @@ namespace ParkingHelp.ParkingDiscountBot
                             var now = DateTime.Now;
                             var today = now.DayOfWeek;
 
-                            string? alertMessage = null;
+                            string alertMessage = "";
                             var dialogTcs = new TaskCompletionSource<IDialog>();
                             page.Dialog += (_, dialog) =>
                             {
                                 alertMessage = dialog.Message;
-                                dialog.AcceptAsync(); // 또는 AcceptAsync();
+                                dialog.AcceptAsync(); 
                                 dialogTcs.TrySetResult(dialog);
                             };
 
@@ -115,28 +116,31 @@ namespace ParkingHelp.ParkingDiscountBot
                                 await discountButton.ClickAsync();
 
                                 // 3. 실제 Dialog가 나타날 때까지 기다림 (최대 3초)
-                                var dialogTask = dialogTcs.Task;
-                                if (await Task.WhenAny(dialogTask, Task.Delay(3000)) == dialogTask)
+                                var dialogTask =dialogTcs.Task;
+                                if (await Task.WhenAny(dialogTask, Task.Delay(5000)) == dialogTask)
                                 {
                                     var dialog = await dialogTask;
                                 }
+                                if (alertMessage.Contains("불가능"))
+                                {
+                                    jobReturn["Result"] = "Fail";
+                                    jobReturn["ReturnMessage"] = $"차량번호:{carNum} 할인권 적용 실패 :{alertMessage}";
+                                    return jobReturn;
+                                }
 
                                 await page.WaitForFunctionAsync(
-                                @"() => {
-                                    const el = document.querySelector('#realFee');
-                                    if (!el) return false;
-                                    const value = el.value.replace(/[^\d]/g, '');
-                                    return parseInt(value) === 0;
-                                }", null, new() { Timeout = 5000 });
-
+                                  "(prev) => document.querySelector('#realFee')?.value !== prev",
+                                    feeValueRaw, // 최대 5초 기다림
+                                    new() { Timeout = 5000 }
+                                );
 
                                 // 금액 다시 확인
                                 string feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
                                 int feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
-                                Console.WriteLine($"할인권 적용 후 주차금액: {feeValueAfter}원");
+                                Console.WriteLine($"할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
 
                                 jobReturn["Result"] = "OK";
-                                jobReturn["ReturnMessage"] = $"할인권 적용 후 주차금액: {feeValueAfter}원";
+                                jobReturn["ReturnMessage"] = $"할인권 적용 후 주차금액: {feeValue}원 => {feeValueAfter}원";
 
                             }
                             else
@@ -166,6 +170,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         {
                             jobReturn["Result"] = "OK";
                             jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
+                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}]는 주차요금이 0원입니다. " , null);
                             Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
                         }
 
@@ -191,11 +196,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         jobReturn = new JObject
                         {
                             ["Result"] = "Fail",
-                            ["ReturnMessage"] = "조회된 차량이 없습니다.",
-                            ["CarList"] = new JObject
-                            {
-                                ["CarNumbers"] = new JArray(carNoList)
-                            }
+                            ["ReturnMessage"] = $"차량번호:{carNumber}는 미등록 차량입니다."
                         };
                     }
                 }

@@ -243,7 +243,6 @@ namespace ParkingHelp.Controllers
                 int applylDiscountCount = reqHelp.DiscountApplyCount ?? 0;
                 if (query.RequestHelpDetail != null)
                 {
-                    bool isRequestHelpFinish = false;
                     foreach (RequestHelpDatailPutParam requestDetail in query.RequestHelpDetail)
                     {
                         var existingDetail = reqHelp.HelpDetails.FirstOrDefault(x => x.Id == requestDetail.Id);
@@ -311,6 +310,7 @@ namespace ParkingHelp.Controllers
                         Id = d.Id,
                         ReqDetailStatus = d.ReqDetailStatus,
                         DiscountApplyDate = d.DiscountApplyDate,
+                        DiscountApplyType = d.DiscountApplyType,
                         InsertDate = d.InsertDate,
                         SlackThreadTs = d.SlackThreadTs
                     }).ToList()
