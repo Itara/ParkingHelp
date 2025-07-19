@@ -6,6 +6,7 @@ using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.DTO;
 using ParkingHelp.Models;
+using ParkingHelp.SlackBot;
 
 namespace ParkingHelp.Controllers
 {
@@ -95,7 +96,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpPost("HelpOffer")]
+        [HttpPost()]
         public async Task<IActionResult> PostRequestHelp([FromBody] RequestHelpPostParam query)
         {
             try
@@ -184,25 +185,74 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpPut("HelpOffer/{id}")]
+        [HttpPut("{id}")]
         public async Task<IActionResult> PutHelpOffer(int id, [FromBody] RequestHelpDetailParam query)
         {
-            //var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
+            var helpOffer = await _context.HelpOffers
+                .Include(h => h.HelperMember)
+                .Include(h => h.HelpDetails)
+                .FirstOrDefaultAsync(h => h.Id == id);
 
-            var reqHelp = await _context.HelpOffers
-                .Include(r => r.HelperMember)
-                .ThenInclude(m => m.Cars)
-                .Include(r => r.HelpDetails).FirstOrDefaultAsync(x => x.Id == id);
-
-            if (reqHelp == null)
-            {
+            if (helpOffer == null)
                 return NotFound("요청이 존재하지 않습니다.");
-            }
 
             try
             {
+                int totalCount = helpOffer.DiscountTotalCount;
+                int completedCount = helpOffer.DiscountApplyCount ?? 0;
+
+                if (query.RequestHelpDetail != null)
+                {
+                    foreach (var detail in query.RequestHelpDetail)
+                    {
+                        var targetDetail = helpOffer.HelpDetails.FirstOrDefault(d => d.Id == detail.Id);
+                        if (targetDetail != null)
+                        {
+                            targetDetail.DiscountApplyDate = detail.DiscountApplyDate ?? targetDetail.DiscountApplyDate;
+                            targetDetail.ReqDetailStatus = detail.Status ?? targetDetail.ReqDetailStatus;
+                            targetDetail.DiscountApplyType = detail.DiscountApplyType ?? targetDetail.DiscountApplyType;
+
+                            if (targetDetail.ReqDetailStatus == ReqDetailStatus.Completed)
+                            {
+                                completedCount++;
+                                targetDetail.DiscountApplyDate = DateTimeOffset.UtcNow;
+                            }
+                                
+                        }
+                    }
+
+                    helpOffer.Status = (completedCount == totalCount) ? query.Status ?? helpOffer.Status : helpOffer.Status;
+                    helpOffer.DiscountApplyCount = completedCount;
+                }
                 await _context.SaveChangesAsync();
-                return Ok(reqHelp);
+
+                var updated = await _context.HelpOffers
+                    .Where(h => h.Id == id)
+                    .Include(h => h.HelperMember)
+                    .Include(h => h.HelpDetails)
+                    .Select(h => new HelpOfferDTO
+                    {
+                        Id = h.Id,
+                        Status = h.Status,
+                        HelperServiceDate = h.HelerServiceDate,
+                        Helper = new HelpMemberDto
+                        {
+                            Id = h.HelperMember.Id,
+                            Name = h.HelperMember.MemberName,
+                            Email = h.HelperMember.Email,
+                            SlackId = h.HelperMember.SlackId
+                        },
+                        HelpOfferDetail = h.HelpDetails.Select(d => new HelpOfferDetailDTO
+                        {
+                            Id = d.Id,
+                            ReqDetailStatus = d.ReqDetailStatus,
+                            DiscountApplyDate = d.DiscountApplyDate,
+                            DiscountApplyType = d.DiscountApplyType
+                        }).ToList()
+                    })
+                    .FirstOrDefaultAsync();
+
+                return Ok(updated);
             }
             catch (Exception ex)
             {
@@ -210,7 +260,7 @@ namespace ParkingHelp.Controllers
                 return BadRequest(jResult.ToString());
             }
         }
-        [HttpDelete("HelpOffer/{id}")]
+        [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRequestHelp(int id)
         {
             var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
