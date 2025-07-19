@@ -27,7 +27,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 using var playwright = await Playwright.CreateAsync();
                 var browser = await playwright.Chromium.LaunchAsync(new()
                 {
-                    Headless = true,
+                    Headless = false,
                     SlowMo = 50,
                     Args = new[]
                     {
