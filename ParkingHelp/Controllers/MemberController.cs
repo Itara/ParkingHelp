@@ -171,6 +171,7 @@ namespace ParkingHelp.Controllers
                         await _context.SaveChangesAsync();
                     }
                 }
+
                 MemberDto newMemberDto = new MemberDto
                 {
                     Id = newMember.Id,
