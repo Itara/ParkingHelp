@@ -49,7 +49,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 {
                     WaitUntil = WaitUntilState.NetworkIdle
                 });
-
+                await page.ScreenshotAsync(new() { Path = "crash_check.png" });
                 // 입력 대기 후 아이디, 비밀번호 채우기
                 await page.WaitForSelectorAsync("#id");
                 await page.FillAsync("#id", "C2115");
