@@ -400,8 +400,8 @@ namespace ParkingHelp.Controllers
                         Helper = r.HelperMember == null ? null : new HelpMemberDto
                         {
                             Id = r.HelperMember.Id,
-                            HelperName = r.HelperMember.MemberName,
-                            HelperEmail = r.HelperMember.Email,
+                            Name = r.HelperMember.MemberName,
+                            Email = r.HelperMember.Email,
                         },
                     })
                     .OrderBy(x => x.Id)
@@ -462,8 +462,8 @@ namespace ParkingHelp.Controllers
                     Helper = r.HelperMember == null ? null : new HelpMemberDto
                     {
                         Id = r.HelperMember.Id,
-                        HelperName = r.HelperMember.MemberName,
-                        HelperEmail = r.HelperMember.Email,
+                        Name = r.HelperMember.MemberName,
+                        Email = r.HelperMember.Email,
                     },
                 })
                 .OrderBy(x => x.Id)

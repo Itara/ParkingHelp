@@ -69,6 +69,8 @@ namespace ParkingHelp.DB
                 .HasForeignKey(d => d.Req_Id)
                 .OnDelete(DeleteBehavior.Cascade);
 
+
+
             // HelpOffer ↔ Member (도와주는 사람)
             modelBuilder.Entity<HelpOfferModel>()
                 .HasOne(h => h.HelperMember)
@@ -76,19 +78,19 @@ namespace ParkingHelp.DB
                 .HasForeignKey(h => h.HelperMemId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // HelpOffer ↔ Member (도움 요청자)
-            modelBuilder.Entity<HelpOfferModel>()
-                .HasOne(h => h.RequestMember)
-                .WithMany()
-                .HasForeignKey(h => h.ReqMemId)
-                .OnDelete(DeleteBehavior.Cascade);
 
-                // HelpOffer ↔ MemberCar (예약 차량)
-            modelBuilder.Entity<HelpOfferModel>()
-                .HasOne(h => h.ReserveCar)
-                .WithMany()
-                .HasForeignKey(h => h.ReserveCarId)
-                .OnDelete(DeleteBehavior.SetNull);
+            // HelpOffer ↔ HelpOfferDetail (1:N)
+            modelBuilder.Entity<HelpOfferDetailModel>()
+                .HasOne(d => d.HelpOffer)
+                .WithMany(r => r.HelpDetails)
+                .HasForeignKey(d => d.HelpOfferId)
+                .OnDelete(DeleteBehavior.Cascade);
+            //helpofferdetail ↔ Member (요청자) 
+            modelBuilder.Entity<HelpOfferDetailModel>()
+               .HasOne(d => d.RequestMember)
+               .WithMany(r => r.HelpOffersDetail)
+               .HasForeignKey(d => d.RequestMemberId)
+               .OnDelete(DeleteBehavior.Cascade);
 
         }
     }

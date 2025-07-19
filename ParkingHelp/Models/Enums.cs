@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace ParkingHelp.Models
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum  RequestHelpStatus
+    public enum  HelpStatus
     {
         [EnumMember(Value = "Waiting (대기)")]
         Waiting = 0, // 대기

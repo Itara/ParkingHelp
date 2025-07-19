@@ -16,7 +16,7 @@ namespace ParkingHelp.DB.QueryCondition
         /// </summary>
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         [DefaultValue(0)]
-        public RequestHelpStatus? Status { get; set; }
+        public HelpStatus? Status { get; set; }
 
         /// <summary>
         /// 요청날짜
@@ -35,7 +35,7 @@ namespace ParkingHelp.DB.QueryCondition
         public int HelpOfferId { get; set; }
         /// <summary>상태 값</summary>
         [DefaultValue(0)]
-        public RequestHelpStatus? Status { get; set; }
+        public HelpStatus? Status { get; set; }
         /// <summary>생성 날짜</summary>
         public DateTime InsertDate { get; set; }
     }
@@ -47,7 +47,7 @@ namespace ParkingHelp.DB.QueryCondition
         public DateTime? HelpDate { get; set; }
         [SwaggerSchema("요청상태 0:대기 , 1:요청확인 , 2 :주차등록 완료", Format = "int")]
         //[DefaultValue(0)]
-        public RequestHelpStatus? Status { get; set; }
+        public HelpStatus? Status { get; set; }
 
         /// <summary>차 번호</summary>
         public string? CarNumber { get; set; }

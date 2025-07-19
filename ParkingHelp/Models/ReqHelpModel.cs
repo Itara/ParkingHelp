@@ -22,7 +22,7 @@ namespace ParkingHelp.Models
         [Column("discount_apply_count")]
         public int? DiscountApplyCount { get; set; }
         [Column("status")]
-        public RequestHelpStatus Status { get; set; }
+        public HelpStatus Status { get; set; }
         [Column("req_date")]
         public DateTimeOffset ReqDate { get; set; } = DateTimeOffset.UtcNow;
         [Column("slack_thread_ts")]

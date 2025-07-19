@@ -33,29 +33,13 @@ namespace ParkingHelp.Controllers
 
             try
             {
-                var query = _context.Members
-                    .Include(m => m.Cars)
-                    .Include(m => m.HelpRequests)
-                    .ThenInclude(req => req.HelpDetails)
-                    .ThenInclude(detail => detail.HelperMember)
-                    .OrderBy(r => r.Id)
-                    .AsQueryable();
-
-                // 조건이 있는 것만 차례대로 붙임
-                query = string.IsNullOrWhiteSpace(param.memberLoginId)
-                    ? query
-                    : query.Where(m => m.MemberLoginId.Contains(param.memberLoginId));
-
-                query = string.IsNullOrWhiteSpace(param.memberName)
-                    ? query
-                    : query.Where(m => m.MemberName.Contains(param.memberName));
-
-                query = string.IsNullOrWhiteSpace(param.carNumber)
-                   ? query
-                   : query.Where(m => m.Cars.Any(mc => mc.CarNumber.Contains(carNumber)));
-
-                var result = await query.OrderBy(r => r.Id).ToListAsync();
-                List<MemberDto> memberDtos = result.Select(m => new MemberDto
+                var memberDtos =await _context.Members.Where(m =>
+                    (string.IsNullOrWhiteSpace(param.memberLoginId) || m.MemberLoginId.Contains(param.memberLoginId)) &&
+                    (string.IsNullOrWhiteSpace(param.memberName) || m.MemberName.Contains(param.memberName)) &&
+                    (string.IsNullOrWhiteSpace(param.carNumber) || m.Cars.Any(c => c.CarNumber.Contains(param.carNumber)))
+                )
+                .OrderBy(m => m.Id)
+                .Select(m => new MemberDto
                 {
                     Id = m.Id,
                     Name = m.MemberName,
@@ -68,7 +52,8 @@ namespace ParkingHelp.Controllers
                         Id = car.Id,
                         CarNumber = car.CarNumber
                     }).ToList(),
-                    RequestHelpHistory = m.HelpRequests?.Select(req => new ReqHelpDto
+
+                    RequestHelpHistory = m.HelpRequests.Select(req => new ReqHelpDto
                     {
                         Id = req.Id,
                         ApplyDisCount = req.DiscountApplyCount,
@@ -80,28 +65,64 @@ namespace ParkingHelp.Controllers
                             Id = req.HelpReqMember.Id,
                             HelpRequesterName = req.HelpReqMember.MemberName,
                             RequesterEmail = req.HelpReqMember.Email,
-                            ReqHelpCar = new ReqHelpCarDto
+                            SlackId = req.HelpReqMember.SlackId,
+                            ReqHelpCar = req.HelpReqMember.Cars.Select(c => new ReqHelpCarDto
                             {
-                                Id = req.HelpReqMember.Cars.First().Id,
-                                CarNumber = req.HelpReqMember.Cars.First().CarNumber
-                            }
-                            
+                                Id = c.Id,
+                                CarNumber = c.CarNumber
+                            }).FirstOrDefault()
                         },
                         HelpDetails = req.HelpDetails.Select(detail => new ReqHelpDetailDto
                         {
                             Id = detail.Id,
                             ReqDetailStatus = detail.ReqDetailStatus,
+                            InsertDate = detail.InsertDate,
                             Helper = detail.HelperMember == null ? null : new HelpMemberDto
                             {
                                 Id = detail.HelperMemberId ?? 0,
-                                HelperName = detail.HelperMember?.MemberName ?? string.Empty,
-                                HelperEmail = detail.HelperMember?.Email ?? string.Empty,
-                                SlackId = detail.HelperMember?.SlackId ?? string.Empty
-                            },
-                            InsertDate = detail.InsertDate
+                                Name = detail.HelperMember.MemberName,
+                                Email = detail.HelperMember.Email,
+                                SlackId = detail.HelperMember.SlackId
+                            }
+                        }).ToList()
+                    }).ToList(),
+
+                    HelpOfferHistory = m.HelpOffers.Select(offer => new HelpOfferDTO
+                    {
+                        Id = offer.Id,
+                        Status = offer.Status,
+                        DiscountTotalCount = offer.DiscountTotalCount,
+                        DiscountApplyCount = offer.DiscountApplyCount,
+                        HelperServiceDate = offer.HelerServiceDate,
+                        Helper = new HelpMemberDto
+                        {
+                            Id = offer.HelperMember.Id,
+                            Name = offer.HelperMember.MemberName,
+                            Email = offer.HelperMember.Email,
+                            SlackId = offer.HelperMember.SlackId
+                        },
+                        HelpOfferDetail = offer.HelpDetails.Select(detail => new HelpOfferDetailDTO
+                        {
+                            Id = detail.Id,
+                            RequestDate = detail.RequestDate,
+                            DiscountApplyDate = detail.DiscountApplyDate,
+                            DiscountApplyType = detail.DiscountApplyType,
+                            HelpRequester = detail.RequestMember == null ? null : new HelpRequesterDto
+                            {
+                                Id = detail.RequestMember.Id,
+                                HelpRequesterName = detail.RequestMember.MemberName,
+                                RequesterEmail = detail.RequestMember.Email,
+                                SlackId = detail.RequestMember.SlackId,
+                                ReqHelpCar = detail.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                                {
+                                    Id = c.Id,
+                                    CarNumber = c.CarNumber
+                                }).FirstOrDefault()
+                            }
                         }).ToList()
                     }).ToList()
-                }).ToList(); 
+                })
+                .ToListAsync();
 
                 return Ok(memberDtos);
             }

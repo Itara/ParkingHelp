@@ -15,10 +15,10 @@ namespace ParkingHelp.Models
         public int HelpOfferId { get; set; }
 
         [Column("status")]
-        public ReqDetailStatus Status { get; set; }
+        public HelpStatus Status { get; set; }
 
-        [Column("helper_mem_id")]
-        public int? HelperMemberId { get; set; }
+        [Column("request_mem_id")]
+        public int? RequestMemberId { get; set; }
 
         [Column("discount_apply_date")]
         public DateTimeOffset? DiscountApplyDate { get; set; }
@@ -26,13 +26,13 @@ namespace ParkingHelp.Models
         [Column("discount_apply_type")]
         public DiscountApplyType DiscountApplyType { get; set; }
 
-        [Column("insert_date")]
-        public DateTimeOffset? InsertDate { get; set; }
+        [Column("request_date")]
+        public DateTimeOffset? RequestDate { get; set; }
 
         [Column("slack_thread_ts")]
         public string? SlackThreadTs { get; set; }
 
         public HelpOfferModel HelpOffer { get; set; } = null!;
-        public MemberModel? HelperMember { get; set; }
+        public MemberModel? RequestMember { get; set; }
     }
 }
