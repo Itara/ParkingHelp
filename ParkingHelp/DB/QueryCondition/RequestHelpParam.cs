@@ -37,9 +37,6 @@ namespace ParkingHelp.DB.QueryCondition
         public int? HelpReqMemId { get; set; }
         [SwaggerSchema("할인요청 갯수", Format = "string")]
         public int TotalDisCount { get; set; }
-        [SwaggerSchema("요청상태값", Format = "int")]
-        [DefaultValue(0)]
-        public HelpStatus RequestHelpStatus { get; set; }
     }
 
     public class RequestHelpDetailParam

@@ -15,7 +15,7 @@ namespace ParkingHelp.Models
         public int HelpOfferId { get; set; }
 
         [Column("status")]
-        public HelpStatus Status { get; set; }
+        public ReqDetailStatus ReqDetailStatus { get; set; }
 
         [Column("request_mem_id")]
         public int? RequestMemberId { get; set; }

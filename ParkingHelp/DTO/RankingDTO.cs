@@ -6,8 +6,11 @@ namespace ParkingHelp.DTO
     public class RankingDTO
     {
         public int Id { get; set; }
-        public int TotalHelpCount { get; set; }
         public string MemberName { get; set; } = string.Empty;
+        public int TotalHelpCount { get; set; }
+        public int Ranking { get; set; }
+        public HelperHistoryDto? HelpOfferHistoryDto { get; set; }
+        public HelperHistoryDto? ReqestHelpHistoryDto { get; set; }
     }
 
     public class HelperHistoryDto
@@ -22,9 +25,7 @@ namespace ParkingHelp.DTO
     {
         public int ReqId { get; set; }
         public DateTimeOffset HelpDate { get; set; }
-
         public int RequestMemberId { get; set; }
-
         public DiscountApplyType DiscountApplyType { get; set; }
     }
 }

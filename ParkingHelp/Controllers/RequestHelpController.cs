@@ -147,6 +147,7 @@ namespace ParkingHelp.Controllers
                        Id = r.Id,
                        ReqDate = r.ReqDate,
                        Status = r.Status,
+                       TotalDisCount =r.DiscountTotalCount,
                        ApplyDisCount = 0,
                        HelpRequester = new HelpRequesterDto
                        {
