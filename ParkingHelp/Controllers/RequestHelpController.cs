@@ -260,9 +260,10 @@ namespace ParkingHelp.Controllers
                             }
                         }
                     }
-                    
-                    isRequestHelpFinish = requestTotalDisCountCount == applylDiscountCount;
-                    if (isRequestHelpFinish)
+
+                    reqHelp.DiscountApplyCount = applylDiscountCount;
+
+                    if (requestTotalDisCountCount == applylDiscountCount)
                     {
                         reqHelp.Status = HelpStatus.Completed;
                     }
@@ -274,8 +275,8 @@ namespace ParkingHelp.Controllers
                     {
                         reqHelp.Status =HelpStatus.Waiting;
                     }
+
                     reqHelp.Status = query.Status ?? reqHelp.Status;
-                    reqHelp.DiscountApplyCount = applylDiscountCount;
                 }
 
                 await _context.SaveChangesAsync();
