@@ -76,6 +76,8 @@ namespace ParkingHelp.Controllers
                         {
                             Id = detail.Id,
                             ReqDetailStatus = detail.ReqDetailStatus,
+                            DiscountApplyDate = detail.DiscountApplyDate,
+                            DiscountApplyType = detail.DiscountApplyType,
                             InsertDate = detail.InsertDate,
                             Helper = detail.HelperMember == null ? null : new HelpMemberDto
                             {

@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using NuGet.ProjectModel;
@@ -14,40 +15,37 @@ namespace ParkingHelp.Controllers
     public class ParkingFeeDisCountRegistorController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly SlackNotifier _slackNotifier;
-        private Queue<ParkingDiscountModel> parkingDiscountModels = new Queue<ParkingDiscountModel>();
         public ParkingFeeDisCountRegistorController(AppDbContext context, SlackOptions slackOptions)
         {
             _context = context;
-            _slackNotifier = new SlackNotifier(slackOptions);
         }
 
         [HttpPost()]
         public async Task<IActionResult> PostDiscountParkingFee([FromBody] ParkingDiscountFeePostParam query)
         {
-            ParkingDiscountBot.ParkingDiscount parkingDiscount = new ParkingDiscountBot.ParkingDiscount(_slackNotifier);
-            JObject result = await parkingDiscount.RegisterParkingDiscountAsync(query.CarNumber,query.NotifySlackAlarm ?? false);
-            if(result != null )
-            {
-                if(result["Result"].ToString() == "OK")
-                {
-                    return Ok(result.ToString());
-                }
-                else
-                {
-                    await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
-                    return BadRequest(result.ToString());
-                }
-            }
-            else
-            {
-                result = new JObject();
-                result.Add("Result", "Fail");
-                result.Add("ReturnMessage", "할인권 요청중 오류가 발생했습니다.");
-                await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
-                return BadRequest(result.ToString());
-            }
-                
+            //ParkingDiscountBot.ParkingDiscount parkingDiscount = new ParkingDiscountBot.ParkingDiscount(_slackNotifier);
+            //JObject result = await parkingDiscount.RegisterParkingDiscountAsync(query.CarNumber,query.NotifySlackAlarm ?? false);
+            //if(result != null )
+            //{
+            //    if(result["Result"].ToString() == "OK")
+            //    {
+            //        return Ok(result.ToString());
+            //    }
+            //    else
+            //    {
+            //        await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
+            //        return BadRequest(result.ToString());
+            //    }
+            //}
+            //else
+            //{
+            //    result = new JObject();
+            //    result.Add("Result", "Fail");
+            //    result.Add("ReturnMessage", "할인권 요청중 오류가 발생했습니다.");
+            //    await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
+            //    return BadRequest(result.ToString());
+            //}
+            return Ok("");
         }
     }
     

@@ -5,17 +5,66 @@ using NuGet.ProjectModel;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 
 namespace ParkingHelp.ParkingDiscountBot
 {
-    public class ParkingDiscount
+    public static class PlaywrightManager
     {
-        private readonly SlackNotifier SlackNotifier;
-        public ParkingDiscount(SlackNotifier _slackNotifier)
+        private static IPlaywright _playwright;
+        private static IBrowser _browser;
+        private static Channel<(string carNumber, TaskCompletionSource<JObject> tcs)> _queue = Channel.CreateUnbounded<(string, TaskCompletionSource<JObject>)>();
+        private static SlackNotifier _slackNotifier;
+        public static void Initialize(SlackNotifier slack)
         {
-            SlackNotifier = _slackNotifier;
+            _ = Task.Run(async () =>
+            {
+                _playwright = await Playwright.CreateAsync();
+                _browser = await _playwright.Chromium.LaunchAsync(new()
+                {
+                    Headless = true,
+                    Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
+                });
+                _slackNotifier = slack;
+                await foreach (var (carNumber, tcs) in _queue.Reader.ReadAllAsync())
+                {
+                    try
+                    {
+                        var result = await RunDiscountAsync(carNumber); // 기존 Playwright 코드 분리
+                        tcs.SetResult(result);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.SetResult(new JObject
+                        {
+                            ["Result"] = "Fail",
+                            ["ReturnMessage"] = ex.Message
+                        });
+                    }
+                }
+            });
         }
-        public async Task<JObject> RegisterParkingDiscountAsync(string carNumber, bool notifySlackChannel = false)
+
+        public static Task<JObject> EnqueueAsync(string carNumber)
+        {
+            var tcs = new TaskCompletionSource<JObject>();
+            _queue.Writer.TryWrite((carNumber, tcs));
+            return tcs.Task;
+        }
+
+        private static async Task<JObject> RunDiscountAsync(string carNumber)
+        {
+            var context = await _browser.NewContextAsync();
+            var page = await context.NewPageAsync();
+
+            var result = await RegisterParkingDiscountAsync(carNumber);
+
+            await page.CloseAsync();
+            await context.CloseAsync();
+            return result;
+        }
+
+        public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, bool notifySlackChannel = false)
         {
             JObject jobReturn = new JObject
             {
@@ -25,22 +74,11 @@ namespace ParkingHelp.ParkingDiscountBot
             try
             {
                 using var playwright = await Playwright.CreateAsync();
-                var browser = await playwright.Chromium.LaunchAsync(new()
-                {
-                    Headless = true,
-                    SlowMo = 50,
-                    Args = new[]
-                    {
-                       "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"
-                    }
-                });
 
-                var context = await browser.NewContextAsync();
+                var context = await _browser.NewContextAsync();
                 var page = await context.NewPageAsync();
 
                 Console.WriteLine("로그인 페이지 이동 중...");
-
-       
                 await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
                 {
                     WaitUntil = WaitUntilState.NetworkIdle
@@ -176,13 +214,13 @@ namespace ParkingHelp.ParkingDiscountBot
                         {
                             jobReturn["Result"] = "OK";
                             jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
-                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}]는 주차요금이 0원입니다. ", null);
+                            await _slackNotifier.SendMessageAsync($"차량번호:[{carNum}]는 주차요금이 0원입니다. ", null);
                             Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
                         }
 
                         if (notifySlackChannel && jobReturn["Result"]!.ToString() == "OK")
                         {
-                            await SlackNotifier.SendMessageAsync($"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다.{jobReturn["ReturnMessage"]}", null);
+                            await _slackNotifier.SendMessageAsync($"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다.{jobReturn["ReturnMessage"]}", null);
                         }
                     }
                     else if (carNoList.Count > 1)
@@ -212,6 +250,18 @@ namespace ParkingHelp.ParkingDiscountBot
                 jobReturn["ReturnMessage"] = ex.Message;
             }
             return jobReturn;
+
         }
+    }
+
+
+    public class ParkingDiscount
+    {
+        private readonly SlackNotifier SlackNotifier;
+        public ParkingDiscount(SlackNotifier _slackNotifier)
+        {
+            SlackNotifier = _slackNotifier;
+        }
+       
     }
 }

@@ -549,15 +549,12 @@ namespace ParkingHelp.Controllers
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
                     updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
                     _context.ReqHelpsDetail.Update(updateTarget);
-
                     var updateReqHelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
-
                     updateReqHelp.DiscountApplyCount = param.DisCountApplyCount ?? updateReqHelp.DiscountApplyCount;
-
                     await _context.SaveChangesAsync();
                 }
 
-                var returnReqHelp = await _context.ReqHelps.Where(r => r.Id == updateTarget.Req_Id) 
+                var returnReqHelp = await _context.ReqHelps.Where(r => r.Id == updateTarget.Req_Id)
                                         .Include(r => r.HelpReqMember)
                                             .ThenInclude(m => m.Cars)
                                         .Include(r => r.HelpDetails)
@@ -584,12 +581,18 @@ namespace ParkingHelp.Controllers
                                                 Id = d.Id,
                                                 ReqDetailStatus = d.ReqDetailStatus,
                                                 DiscountApplyDate = d.DiscountApplyDate,
-                                                DiscountApplyType =d.DiscountApplyType,
+                                                DiscountApplyType = d.DiscountApplyType,
                                                 InsertDate = d.InsertDate,
-                                                SlackThreadTs = d.SlackThreadTs
+                                                SlackThreadTs = d.SlackThreadTs,
+                                                Helper = d.HelperMember == null ? null : new HelpMemberDto
+                                                {
+                                                    Id = d.HelperMember.Id,
+                                                    Name = d.HelperMember.MemberName,
+                                                    Email = d.HelperMember.Email,
+                                                    SlackId = d.HelperMember.SlackId
+                                                }
                                             }).ToList()
-                                        })
-                                        .ToListAsync();
+                                        }).ToListAsync();
 
                 return Ok(returnReqHelp);
             }
