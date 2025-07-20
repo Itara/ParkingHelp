@@ -439,7 +439,7 @@ namespace ParkingHelp.Controllers
 
 
         [HttpPut("ReqHelpDetail")]
-        public async Task<IActionResult> PutRequestHelpDetailMultiUpdate([FromBody] PutRequestHelpDetailMultiUpdateParam param)
+        public async Task<IActionResult> PutRequestHelpDetailMultiUpdate([FromBody] RequestHelpDetailMultiUpdatePutParam param)
         {
             try
             {
@@ -459,7 +459,7 @@ namespace ParkingHelp.Controllers
                 {
                     List<ReqHelpDetailModel> helpDetailModels = helpDetailModels = reqHelp.HelpDetails.OrderBy(x => x.Id).Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue).ToList();
 
-                    foreach (var ReqHelpDetailModel in helpDetailModels.Where(d => d.ReqDetailStatus == param.UpdateTargetReqDetailStatus))
+                    foreach (var ReqHelpDetailModel in helpDetailModels)
                     {
                         ReqHelpDetailModel.DiscountApplyDate = param.RequestHelpDatailPutParam.DiscountApplyDate ?? ReqHelpDetailModel.DiscountApplyDate;
                         ReqHelpDetailModel.DiscountApplyType = param.RequestHelpDatailPutParam.DiscountApplyType ?? ReqHelpDetailModel.DiscountApplyType;
@@ -544,18 +544,13 @@ namespace ParkingHelp.Controllers
                 else
                 {
                     updateTarget.HelperMemberId = param.HelperMemId.HasValue ? (param.HelperMemId == 0 ? null : param.HelperMemId) : updateTarget.HelperMemberId;
-
                     updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
                     updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
                     _context.ReqHelpsDetail.Update(updateTarget);
+                    var updateReqHelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
+                    updateReqHelp.DiscountApplyCount = param.DisApplyCount;
 
-                    if (updateTarget.ReqDetailStatus == ReqDetailStatus.Completed)
-                    {
-                        var updateReqHelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
-                        updateReqHelp.DiscountApplyCount = updateReqHelp.DiscountApplyCount == null ? 1 : updateReqHelp.DiscountApplyCount.Value + 1; //null이면 0과 동일하므로  
-                        _context.ReqHelps.Update(updateReqHelp);
-                    }
                     await _context.SaveChangesAsync();
                 }
 
