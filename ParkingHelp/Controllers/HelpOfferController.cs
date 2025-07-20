@@ -186,7 +186,7 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutHelpOffer(int id, [FromBody] HelpOfferPutParam query)
+        public async Task<IActionResult> PutHelpOffer(int id , [FromBody] HelpOfferPutParam query)
         {
             if (query == null)
                 return BadRequest("요청 데이터가 없습니다.");
@@ -195,7 +195,6 @@ namespace ParkingHelp.Controllers
             {
                 var helpOffer = await _context.HelpOffers
                     .Include(h => h.HelperMember)
-                    .ThenInclude(h => h.Cars)
                     .Include(h => h.HelpDetails)
                     .ThenInclude(d => d.RequestMember)
                     .ThenInclude(m => m.Cars)
@@ -211,6 +210,7 @@ namespace ParkingHelp.Controllers
                     helpOffer.HelerServiceDate = helpOffer.HelerServiceDate;
                     helpOffer.Status = query.Status ?? helpOffer.Status;
 
+                    int currentApplyCount = helpOffer.DiscountApplyCount ?? 0;
                     var detailIds = query.HelpOfferDetail?.Select(x => x.Id).ToHashSet() ?? new HashSet<int>();
                     var existingDetails = helpOffer.HelpDetails.Where(d => detailIds.Contains(d.Id)).ToDictionary(d => d.Id);
 
@@ -221,14 +221,27 @@ namespace ParkingHelp.Controllers
                             if (!existingDetails.TryGetValue(detail.Id, out var existing))
                                 continue;
 
-                            if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
+                            //if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
+                            if (detail.ReqMemberId.HasValue)
                             {
-                                existing.RequestMemberId = query.HelpMemId.Value;
+                                existing.RequestMemberId = detail.ReqMemberId == 0 ? null : detail.ReqMemberId;
                             }
-
                             var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
 
                             existing.ReqDetailStatus = detail.Status ?? existing.ReqDetailStatus;
+                            if (detail.Status.HasValue)
+                            {
+                                switch (detail.Status.Value)
+                                {
+                                    case ReqDetailStatus.Waiting:
+                                        currentApplyCount--;
+                                        break;
+
+                                    case ReqDetailStatus.Check:
+                                        currentApplyCount++;
+                                        break;
+                                }
+                            }
                             existing.DiscountApplyType = detail.DiscountApplyType ?? existing.DiscountApplyType;
 
                             if (statusChanged && existing.ReqDetailStatus == ReqDetailStatus.Completed)
@@ -243,30 +256,19 @@ namespace ParkingHelp.Controllers
                             {
                                 existing.RequestDate = detail.RequestDate.Value;
                             }
+
+                            await _context.Entry(existing)
+                             .Reference(e => e.RequestMember)
+                             .Query()
+                             .Include(m => m.Cars)
+                             .LoadAsync();
                         }
                     }
-
-                    var completedCount = helpOffer.HelpDetails.Count(d => d.ReqDetailStatus == ReqDetailStatus.Completed);
-                    helpOffer.DiscountApplyCount = completedCount;
-
-                    if (!query.Status.HasValue)
-                    {
-                        if (helpOffer.DiscountApplyCount == helpOffer.DiscountTotalCount)
-                        {
-                            helpOffer.Status = HelpStatus.Completed;
-                        }
-                        else if (helpOffer.DiscountApplyCount > 0)
-                        {
-                            helpOffer.Status = HelpStatus.Check;
-                        }
-                        else
-                        {
-                            helpOffer.Status = HelpStatus.Waiting;
-                        }
-                    }
+                    helpOffer.DiscountApplyCount = currentApplyCount;
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
+       
 
                     var updatedDto = new HelpOfferDTO
                     {
