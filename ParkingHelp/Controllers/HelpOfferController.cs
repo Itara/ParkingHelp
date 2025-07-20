@@ -389,7 +389,92 @@ namespace ParkingHelp.Controllers
             }
         }
 
+        [HttpDelete("HelpOfferDetail/{HelpOfferDetailId}")]
+        public async Task<IActionResult> DelteRequestHelpDetail(int HelpOfferDetailId)
+        {
+            try
+            {
+                JObject returnJob = new JObject();
 
+                if (_context.HelpOffersDetail.Any(m => m.Id == HelpOfferDetailId))
+                {
+
+                    var deleteHelpOfferDetail = _context.HelpOffersDetail
+                        .Include(r => r.HelpOffer)
+                        .Include(r => r.RequestMember)
+                        .Where(x => x.Id == HelpOfferDetailId).First();
+
+                    int reqId = deleteHelpOfferDetail.HelpOfferId;
+                    var updateHelpOffer = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == reqId);
+
+                    _context.HelpOffersDetail.Remove(deleteHelpOfferDetail);
+                    if (updateHelpOffer != null)
+                    {
+                        if (updateHelpOffer.DiscountTotalCount == updateHelpOffer.DiscountApplyCount)
+                        {
+                            updateHelpOffer.DiscountApplyCount -= 1;
+                        }
+                        updateHelpOffer.DiscountTotalCount -= 1;
+
+                        if (updateHelpOffer.DiscountTotalCount < 1)
+                        {
+                            _context.HelpOffers.Remove(updateHelpOffer);
+                        }
+                        else
+                        {
+                            _context.HelpOffers.Update(updateHelpOffer);
+                        }
+                        await _context.SaveChangesAsync();
+                    }
+
+                    var returnHelpOffer = await _context.HelpOffers.Where(r => r.Id == reqId)
+                                      .Include(r => r.HelperMember)
+                                          .ThenInclude(m => m.Cars)
+                                      .Include(r => r.HelpDetails)
+                                      .Select(r => new HelpOfferDTO
+                                      {
+                                          Id = r.Id,
+                                          HelperServiceDate = r.HelerServiceDate,
+                                          Status = r.Status,
+                                          DiscountTotalCount = r.DiscountTotalCount,
+                                          DiscountApplyCount = r.DiscountApplyCount, // 적용 수량은 추후 계산 or 외부 값
+                                          Helper = new HelpMemberDto
+                                          {
+                                              Id = r.HelperMember.Id,
+                                              Name = r.HelperMember.MemberName,
+                                              Email = r.HelperMember.Email,
+                                              SlackId = r.HelperMember.SlackId
+                                          },
+                                          HelpOfferDetail = r.HelpDetails.Select(d => new HelpOfferDetailDTO
+                                          {
+                                              Id = d.Id,
+                                              ReqDetailStatus = d.ReqDetailStatus,
+                                              DiscountApplyDate = d.DiscountApplyDate,
+                                              DiscountApplyType = d.DiscountApplyType,
+                                              RequestDate = d.RequestDate,
+                                              HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                                              {
+                                                  Id = d.RequestMember.Id,
+                                                  HelpRequesterName = d.RequestMember.MemberName,
+                                                  RequesterEmail = d.RequestMember.Email,
+                                                  SlackId = d.RequestMember.SlackId
+                                              }
+                                          }).ToList()
+                                      }).ToListAsync();
+                    return Ok(returnHelpOffer);
+                }
+                else
+                {
+                    returnJob = GetErrorJobject("해당 ID값이 존재하지않습니다.", "");
+                    return NotFound(returnJob.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
+        }
 
 
         private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
