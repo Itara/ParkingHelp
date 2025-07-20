@@ -47,6 +47,7 @@ namespace ParkingHelp.ParkingDiscountBot
 
         public static Task<JObject> EnqueueAsync(string carNumber)
         {
+            Channel.CreateBounded<(string, TaskCompletionSource<JObject>)>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.Wait });
             var tcs = new TaskCompletionSource<JObject>();
             _queue.Writer.TryWrite((carNumber, tcs));
             return tcs.Task;
@@ -73,8 +74,7 @@ namespace ParkingHelp.ParkingDiscountBot
             };
             try
             {
-                using var playwright = await Playwright.CreateAsync();
-
+                
                 var context = await _browser.NewContextAsync();
                 var page = await context.NewPageAsync();
 
@@ -254,14 +254,4 @@ namespace ParkingHelp.ParkingDiscountBot
         }
     }
 
-
-    public class ParkingDiscount
-    {
-        private readonly SlackNotifier SlackNotifier;
-        public ParkingDiscount(SlackNotifier _slackNotifier)
-        {
-            SlackNotifier = _slackNotifier;
-        }
-       
-    }
 }
