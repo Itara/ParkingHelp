@@ -2,6 +2,7 @@
 
 namespace ParkingHelp.DB.QueryCondition
 {
+    
     public class ParkingDiscountFeePostParam
     {
         public string CarNumber { get; set; } = string.Empty;

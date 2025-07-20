@@ -10,13 +10,19 @@ using System.Threading.Channels;
 
 namespace ParkingHelp.ParkingDiscountBot
 {
+    public enum DiscountJobType
+    {
+        ApplyDiscount,
+        CheckFeeOnly
+    }
     public static class PlaywrightManager
     {
         private static IPlaywright _playwright;
         private static IBrowser _browser;
         private static IBrowserContext _context;  // 전역 context 추가
 
-        private static Channel<(string carNumber, TaskCompletionSource<JObject> tcs)> _queue = Channel.CreateUnbounded<(string, TaskCompletionSource<JObject>)>();
+        private static Channel<(string carNumber, DiscountJobType jobType, TaskCompletionSource<JObject> tcs)> _queue
+            = Channel.CreateUnbounded<(string, DiscountJobType, TaskCompletionSource<JObject>)>();
 
         public static void Initialize()
         {
@@ -29,11 +35,16 @@ namespace ParkingHelp.ParkingDiscountBot
                     Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 });
                 _context = await _browser.NewContextAsync();
-                await foreach (var (carNumber, tcs) in _queue.Reader.ReadAllAsync())
+                await foreach (var (carNumber, jobType, tcs) in _queue.Reader.ReadAllAsync())
                 {
                     try
                     {
-                        var result = await RunDiscountAsync(carNumber); // 기존 Playwright 코드 분리
+                        var result = jobType switch
+                        {
+                            DiscountJobType.ApplyDiscount => await RunDiscountAsync(carNumber),
+                            DiscountJobType.CheckFeeOnly => await RunCheckFeeAsync(carNumber),
+                            _ => new JObject { ["Result"] = "Fail", ["ReturnMessage"] = "Unknown Job Type" }
+                        };
                         tcs.SetResult(result);
                     }
                     catch (Exception ex)
@@ -48,19 +59,64 @@ namespace ParkingHelp.ParkingDiscountBot
             });
         }
 
-        public static Task<JObject> EnqueueAsync(string carNumber)
+        public static Task<JObject> EnqueueAsync(string carNumber, DiscountJobType jobType)
         {
             var tcs = new TaskCompletionSource<JObject>();
-            _queue.Writer.TryWrite((carNumber, tcs));
+            _queue.Writer.TryWrite((carNumber, jobType, tcs));
             return tcs.Task;
         }
-
+        private static async Task<JObject> RunCheckFeeAsync(string carNumber)
+        {
+            var page = await _context.NewPageAsync();
+            var result = await CheckParkingFeeOnlyAsync(carNumber, page);
+            await page.CloseAsync();
+            return result;
+        }
         private static async Task<JObject> RunDiscountAsync(string carNumber)
         {
             var page = await _context.NewPageAsync(); // context 재사용
             var result = await RegisterParkingDiscountAsync(carNumber, page);
             await page.CloseAsync();
             return result;
+        }
+        private static async Task<JObject> CheckParkingFeeOnlyAsync(string carNumber, IPage page)
+        {
+            JObject jobReturn = new JObject
+            {
+                ["Result"] = "Fail",
+                ["ReturnMessage"] = "Unknown Error"
+            };
+
+            try
+            {
+                await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new() { WaitUntil = WaitUntilState.NetworkIdle });
+                if (page.Url.Contains("login"))
+                {
+                    await page.FillAsync("#id", "C2115");
+                    await page.FillAsync("#password", "6636");
+                    await page.ClickAsync("#loginBtn");
+                    await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                }
+
+                await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/discount-search/original", new() { WaitUntil = WaitUntilState.NetworkIdle });
+
+                await page.FillAsync("#carNo", $"{carNumber}");
+                await page.ClickAsync("#btnCarSearch");
+                await page.WaitForSelectorAsync("#searchDataTable tbody tr");
+
+                var feeValueRaw = await page.Locator("#realFee").InputValueAsync();
+                int feeValue = int.Parse(Regex.Replace(feeValueRaw, @"[^0-9]", ""));
+
+                jobReturn["Result"] = "OK";
+                jobReturn["ReturnMessage"] = $"차량번호 [{carNumber}]의 현재 주차요금은 {feeValue}원입니다.";
+                jobReturn["Fee"] = feeValue;
+            }
+            catch (Exception ex)
+            {
+                jobReturn["ReturnMessage"] = ex.Message;
+            }
+
+            return jobReturn;
         }
 
         public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, IPage page, bool notifySlackChannel = false)
@@ -220,7 +276,6 @@ namespace ParkingHelp.ParkingDiscountBot
                             jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
                             Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
                         }
-
                     }
                     else if (carNoList.Count > 1)
                     {

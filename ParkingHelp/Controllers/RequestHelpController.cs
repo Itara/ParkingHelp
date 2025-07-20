@@ -168,11 +168,11 @@ namespace ParkingHelp.Controllers
                            Id = r.HelpReqMember.Id,
                            HelpRequesterName = r.HelpReqMember.MemberName,
                            RequesterEmail = r.HelpReqMember.Email,
-                           ReqHelpCar = new ReqHelpCarDto
+                           ReqHelpCar = r.HelpReqMember.Cars.Select(c => new ReqHelpCarDto
                            {
-                               Id = r.HelpReqMember.Cars.First().Id,
-                               CarNumber = r.HelpReqMember.Cars.First().CarNumber
-                           }
+                               Id = c.Id,
+                               CarNumber = c.CarNumber
+                           }).FirstOrDefault()
                        },
                        HelpDetails = r.HelpDetails
                     .Select(d => new ReqHelpDetailDto

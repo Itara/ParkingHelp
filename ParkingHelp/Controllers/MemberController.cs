@@ -33,6 +33,40 @@ namespace ParkingHelp.Controllers
 
             try
             {
+
+                var offerDetailGroups = await _context.HelpOffersDetail
+                .Where(d => d.RequestMemberId != null)
+                .Select(d => new
+                {
+                    MemberId = d.RequestMemberId.Value,
+                    Detail = new HelpOfferDetailDTO
+                    {
+                        Id = d.Id,
+                        RequestDate = d.RequestDate,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        DiscountApplyType = d.DiscountApplyType,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        HelpRequester = new HelpRequesterDto
+                        {
+                            Id = d.RequestMemberId.Value,
+                            HelpRequesterName = d.RequestMember.MemberName,
+                            RequesterEmail = d.RequestMember.Email,
+                            SlackId = d.RequestMember.SlackId,
+                            ReqHelpCar = d.RequestMember.Cars
+                                .Select(c => new ReqHelpCarDto
+                                {
+                                    Id = c.Id,
+                                    CarNumber = c.CarNumber
+                                })
+                                .FirstOrDefault()
+                        }
+                    }
+                })
+                .ToListAsync();
+
+                var groupedByMember = offerDetailGroups .GroupBy(x => x.MemberId).ToDictionary(g => g.Key, g => g.Select(x => x.Detail).ToList());
+
+
                 var memberDtos = await _context.Members.Where(m =>
                     (string.IsNullOrWhiteSpace(param.memberLoginId) || m.MemberLoginId.Contains(param.memberLoginId)) &&
                     (string.IsNullOrWhiteSpace(param.memberName) || m.MemberName.Contains(param.memberName)) &&
@@ -123,9 +157,15 @@ namespace ParkingHelp.Controllers
                                 }).FirstOrDefault()
                             }
                         }).ToList()
-                    }).ToList()
+                    }).ToList(),
+                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id)? groupedByMember[m.Id]  : new List<HelpOfferDetailDTO>()
                 })
                 .ToListAsync();
+            
+                //foreach(MemberDto memberDto in memberDtos)
+                //{
+                 
+                //}
 
                 return Ok(memberDtos);
             }
