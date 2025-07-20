@@ -12,7 +12,7 @@
 
         public List<HelpOfferDTO>? HelpOfferHistory { get; set; } //Login할때 기본적으로 d가져올 자신의 도움내역
 
-        public List<HelpOfferDetailDTO>? HelpOfferMyRequestHistory { get; set; } //Login할때 기본적으로 d가져올 자신의 도움내역
+        public List<MyHelpOfferDetailDTO>? HelpOfferMyRequestHistory { get; set; } //Login할때 기본적으로 d가져올 자신의 도움내역
 
     }
 

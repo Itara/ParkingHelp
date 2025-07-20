@@ -39,7 +39,7 @@ namespace ParkingHelp.Controllers
                 .Select(d => new
                 {
                     MemberId = d.RequestMemberId.Value,
-                    Detail = new HelpOfferDetailDTO
+                    Detail = new MyHelpOfferDetailDTO
                     {
                         Id = d.Id,
                         RequestDate = d.RequestDate,
@@ -59,7 +59,14 @@ namespace ParkingHelp.Controllers
                                     CarNumber = c.CarNumber
                                 })
                                 .FirstOrDefault()
-                        }
+                        },
+                        Helper = new HelpMemberDto
+                        {
+                            Id = d.HelpOffer.HelperMember.Id,
+                            Name = d.HelpOffer.HelperMember.MemberName,
+                            Email = d.HelpOffer.HelperMember.Email,
+                            SlackId = d.HelpOffer.HelperMember.SlackId
+                        },
                     }
                 })
                 .ToListAsync();
@@ -158,7 +165,7 @@ namespace ParkingHelp.Controllers
                             }
                         }).ToList()
                     }).ToList(),
-                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id)? groupedByMember[m.Id]  : new List<HelpOfferDetailDTO>()
+                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id)? groupedByMember[m.Id]  : new List<MyHelpOfferDetailDTO>()
                 })
                 .ToListAsync();
             

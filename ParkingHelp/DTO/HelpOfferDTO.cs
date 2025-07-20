@@ -25,6 +25,16 @@ namespace ParkingHelp.DTO
         public DiscountApplyType DiscountApplyType { get; set; }
         public DateTimeOffset? RequestDate { get; set; }
     }
-
+    
+    public class MyHelpOfferDetailDTO
+    {
+        public int Id { get; set; }
+        public HelpRequesterDto? HelpRequester { get; set; }
+        public ReqDetailStatus ReqDetailStatus { get; set; }
+        public DateTimeOffset? DiscountApplyDate { get; set; }
+        public DiscountApplyType DiscountApplyType { get; set; }
+        public DateTimeOffset? RequestDate { get; set; }
+        public HelpMemberDto Helper { get; set; } = null!;
+    }
 
 }
