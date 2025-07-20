@@ -61,7 +61,7 @@ namespace ParkingHelp.Controllers
                 {
                     reqHelpsQuery = reqHelpsQuery.Where(r => r.Status == query.Status);
                 }
-                if(query.ReqDetailStatus.HasValue)
+                if (query.ReqDetailStatus.HasValue)
                 {
                     reqHelpsQuery = reqHelpsQuery.Where(r => r.HelpDetails.Any(d => d.ReqDetailStatus == query.ReqDetailStatus));
                 }
@@ -135,7 +135,7 @@ namespace ParkingHelp.Controllers
 
                 _context.ReqHelps.Add(newReqHelp);
                 await _context.SaveChangesAsync();
-                
+
                 List<ReqHelpDetailModel> reqHelpDetailModels = new();
                 for (int i = 0; i < query.TotalDisCount; i++)
                 {
@@ -148,8 +148,8 @@ namespace ParkingHelp.Controllers
                 }
 
                 _context.ReqHelpsDetail.AddRange(reqHelpDetailModels);
-            
-                
+
+
                 await _context.SaveChangesAsync();
 
                 var returnNewReqHelps = await _context.ReqHelps
@@ -161,7 +161,7 @@ namespace ParkingHelp.Controllers
                        Id = r.Id,
                        ReqDate = r.ReqDate,
                        Status = r.Status,
-                       TotalDisCount =r.DiscountTotalCount,
+                       TotalDisCount = r.DiscountTotalCount,
                        ApplyDisCount = 0,
                        HelpRequester = new HelpRequesterDto
                        {
@@ -204,11 +204,11 @@ namespace ParkingHelp.Controllers
                 JObject? resultSlaclSendMessage = null;
                 if (requestSlackId != "Unknown Slack ID")
                 {
-                   // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"<@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                    // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"<@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
                 }
                 else
                 {
-                   // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                    // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
                 }
 
                 if (resultSlaclSendMessage != null && Convert.ToBoolean(resultSlaclSendMessage["ok"])) // 슬랙 메시지 전송 성공시
@@ -259,11 +259,11 @@ namespace ParkingHelp.Controllers
                         if (existingDetail != null) //세부내용
                         {
                             //HelperMemberId 가 0으로 들어오면 삭제
-                            existingDetail.HelperMemberId = requestDetail.HelperMemId.HasValue ?( requestDetail.HelperMemId == 0 ? null : requestDetail.HelperMemId) : existingDetail.HelperMemberId;                           
+                            existingDetail.HelperMemberId = requestDetail.HelperMemId.HasValue ? (requestDetail.HelperMemId == 0 ? null : requestDetail.HelperMemId) : existingDetail.HelperMemberId;
                             existingDetail.DiscountApplyDate = requestDetail.DiscountApplyDate ?? existingDetail.DiscountApplyDate;
                             existingDetail.ReqDetailStatus = requestDetail.Status ?? existingDetail.ReqDetailStatus;
                             existingDetail.DiscountApplyType = requestDetail.DiscountApplyType ?? existingDetail.DiscountApplyType;
-                        
+
                             if (existingDetail.ReqDetailStatus == ReqDetailStatus.Waiting && existingDetail.HelperMemberId.HasValue && existingDetail.HelperMemberId != 0)
                             {
                                 existingDetail.ReqDetailStatus = ReqDetailStatus.Check;
@@ -457,9 +457,8 @@ namespace ParkingHelp.Controllers
                 }
                 else
                 {
-                    
-                    List<ReqHelpDetailModel> helpDetailModels = reqHelp.HelpDetails.OrderBy(x => x.Id).ToList();
-                    
+                    List<ReqHelpDetailModel> helpDetailModels = helpDetailModels = reqHelp.HelpDetails.OrderBy(x => x.Id).Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue).ToList();
+
                     foreach (var ReqHelpDetailModel in helpDetailModels.Where(d => d.ReqDetailStatus == param.UpdateTargetReqDetailStatus))
                     {
                         ReqHelpDetailModel.DiscountApplyDate = param.RequestHelpDatailPutParam.DiscountApplyDate ?? ReqHelpDetailModel.DiscountApplyDate;
@@ -474,28 +473,50 @@ namespace ParkingHelp.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                var reqHelpDetail = await _context.ReqHelpsDetail
-                .Include(r => r.ReqHelps)
-                .Include(r => r.HelperMember)
-                .Where(x => x.Id == updateReqId)
-                .Select(r => new ReqHelpDetailDto
-                {
-                    Id = r.Id,
-                    ReqDetailStatus = r.ReqDetailStatus,
-                    DiscountApplyDate = r.DiscountApplyDate,
-                    DiscountApplyType = r.DiscountApplyType,
-                    InsertDate = r.InsertDate,
-                    SlackThreadTs = r.SlackThreadTs,
-                    Helper = r.HelperMember == null ? null : new HelpMemberDto
-                    {
-                        Id = r.HelperMember.Id,
-                        Name = r.HelperMember.MemberName,
-                        Email = r.HelperMember.Email,
-                    },
-                })
-                .OrderBy(x => x.Id)
-                .ToListAsync();
-                return Ok(reqHelpDetail);
+                var updateReqHelps = await _context.ReqHelps
+               .Where(r => r.Id == updateReqId)
+               .Include(r => r.HelpReqMember)
+               .Include(r => r.ReqCar)
+               .Include(r => r.HelpDetails)
+               .Select(r => new ReqHelpDto
+               {
+                   Id = r.Id,
+                   ReqDate = r.ReqDate,
+                   Status = r.Status,
+                   ApplyDisCount = r.DiscountApplyCount,
+                   TotalDisCount = r.DiscountTotalCount,
+                   HelpRequester = new HelpRequesterDto
+                   {
+                       Id = r.HelpReqMember.Id,
+                       HelpRequesterName = r.HelpReqMember.MemberName,
+                       RequesterEmail = r.HelpReqMember.Email,
+                       SlackId = r.HelpReqMember.SlackId,
+                       ReqHelpCar = new ReqHelpCarDto
+                       {
+                           Id = r.HelpReqMember.Cars.First().Id,
+                           CarNumber = r.HelpReqMember.Cars.First().CarNumber
+                       }
+                   }
+                  ,
+                   HelpDetails = r.HelpDetails.Select(d => new ReqHelpDetailDto
+                   {
+                       Id = d.Id,
+                       ReqDetailStatus = d.ReqDetailStatus,
+                       DiscountApplyDate = d.DiscountApplyDate,
+                       DiscountApplyType = d.DiscountApplyType,
+                       InsertDate = d.InsertDate,
+                       Helper = d.HelperMember == null ? null : new HelpMemberDto
+                       {
+                           Id = d.HelperMember.Id,
+                           Name = d.HelperMember.MemberName,
+                           Email = d.HelperMember.Email,
+                           SlackId = d.HelperMember.SlackId
+                       },
+                       SlackThreadTs = d.SlackThreadTs
+                   }).ToList()
+               })
+               .FirstOrDefaultAsync();
+                return Ok(updateReqHelps);
             }
             catch (Exception ex)
             {
@@ -523,7 +544,7 @@ namespace ParkingHelp.Controllers
                 else
                 {
                     updateTarget.HelperMemberId = param.HelperMemId.HasValue ? (param.HelperMemId == 0 ? null : param.HelperMemId) : updateTarget.HelperMemberId;
-                    
+
                     updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
                     updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
