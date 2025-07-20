@@ -9,7 +9,7 @@ namespace ParkingHelp.DB.QueryCondition
         public DiscountApplyType? DisCountApplyType { get; set; }
         public ReqDetailStatus? ReqDetailStatus { get; set; }
         public int? HelperMemId { get; set; }
-        public int? DisCountApplyCount { get; set; }
+        //public int? DisCountApplyCount { get; set; }
     }
 
     public class RequestHelpDetailMultiUpdatePutParam

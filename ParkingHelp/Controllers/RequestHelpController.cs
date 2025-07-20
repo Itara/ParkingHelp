@@ -444,7 +444,6 @@ namespace ParkingHelp.Controllers
             try
             {
                 int updateReqId = param.ReqId;
-
                 var reqHelp = await _context.ReqHelps
                 .Include(r => r.HelpReqMember)
                 .ThenInclude(m => m.Cars)
@@ -464,7 +463,6 @@ namespace ParkingHelp.Controllers
                       .OrderBy(x => x.Id)
                       .Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue)
                       .ToList();
-
 
                     foreach (var ReqHelpDetailModel in helpDetailModels)
                     {
@@ -550,13 +548,27 @@ namespace ParkingHelp.Controllers
                 }
                 else
                 {
+                    ReqHelpModel rephelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
+                    
                     updateTarget.HelperMemberId = param.HelperMemId.HasValue ? (param.HelperMemId == 0 ? null : param.HelperMemId) : updateTarget.HelperMemberId;
                     updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
-                    updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
+                    if (param.ReqDetailStatus.HasValue)
+                    {
+                        updateTarget.ReqDetailStatus = param.ReqDetailStatus.Value;
+                        switch (param.ReqDetailStatus.Value)
+                        {
+                            case ReqDetailStatus.Waiting:
+                                rephelp.DiscountApplyCount = rephelp.DiscountApplyCount > 0 ? rephelp.DiscountApplyCount - 1 : 0;
+                                break;
+                            case ReqDetailStatus.Check:
+                                rephelp.DiscountApplyCount = rephelp.DiscountApplyCount >= rephelp.DiscountTotalCount ? rephelp.DiscountTotalCount : rephelp.DiscountApplyCount + 1;
+                                break;
+                        }
+                    }
+                     
                     _context.ReqHelpsDetail.Update(updateTarget);
-                    var updateReqHelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
-                    updateReqHelp.DiscountApplyCount = param.DisCountApplyCount ?? updateReqHelp.DiscountApplyCount;
+
                     await _context.SaveChangesAsync();
                 }
 
@@ -630,8 +642,12 @@ namespace ParkingHelp.Controllers
 
                     if (updateReqHelp != null)
                     {
+                        if (updateReqHelp.DiscountTotalCount == updateReqHelp.DiscountApplyCount)
+                        {
+                            updateReqHelp.DiscountApplyCount -= 1;
+                        }
                         updateReqHelp.DiscountTotalCount -= 1;
-
+                        
                         if (updateReqHelp.DiscountTotalCount < 1)
                         {
                             _context.ReqHelps.Remove(updateReqHelp);
