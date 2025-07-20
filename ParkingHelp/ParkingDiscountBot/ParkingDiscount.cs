@@ -39,6 +39,17 @@ namespace ParkingHelp.ParkingDiscountBot
                 var page = await context.NewPageAsync();
 
                 Console.WriteLine("로그인 페이지 이동 중...");
+
+                await page.RouteAsync("**/*", async route => //불필요한 리소스 안받기
+                {
+                    var req = route.Request;
+                    if (req.ResourceType is "image" or "font" or "stylesheet")
+                        await route.AbortAsync();
+                    else
+                        await route.ContinueAsync();
+                });
+
+
                 await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
                 {
                     WaitUntil = WaitUntilState.NetworkIdle

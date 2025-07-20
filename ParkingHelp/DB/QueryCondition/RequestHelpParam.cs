@@ -23,9 +23,9 @@ namespace ParkingHelp.DB.QueryCondition
         /// 요청날짜
         /// </summary>
         /// <param name="fromDate">조회 시작일 (기본값: 오늘 0시)</param>
-        [SwaggerSchema("조회 시작일 (기본값: 오늘 00:00)", Format = "date-time")]
+        [SwaggerSchema("조회 시작일 (기본값: 오늘 00:00) UTC", Format = "date-time")]
         public DateTimeOffset? FromReqDate { get; set; }
-        [SwaggerSchema("조회 시작일 (기본값: 오늘 23:59)", Format = "date-time")]
+        [SwaggerSchema("조회 시작일 (기본값: 오늘 23:59) UTC", Format = "date-time")]
         /// <summary>요청일 범위 끝</summary>
         public DateTimeOffset? ToReqDate { get; set; }
     }
@@ -59,9 +59,12 @@ namespace ParkingHelp.DB.QueryCondition
     public class RequestHelpDatailPutParam
     {
         public int Id { get; set; }
-        [SwaggerSchema("도움요청자의 고유ID", Format = "int")]
+        [SwaggerSchema("도움요청자의 고유ID 0입력시 Null값입력", Format = "int")]
         public int? HelperMemId { get; set; }
+
+        [SwaggerSchema("주차 등록상태", Format = "int")]
         public ReqDetailStatus? Status { get; set; }
+        [SwaggerSchema("요청 수락 일자 UTC값 입력", Format = "date-time")]
         public DateTimeOffset? DiscountApplyDate { get; set; }
         public DiscountApplyType? DiscountApplyType { get; set; }
     }

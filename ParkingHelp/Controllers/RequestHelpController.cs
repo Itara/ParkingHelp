@@ -251,49 +251,27 @@ namespace ParkingHelp.Controllers
             try
             {
                 int requestTotalDisCountCount = reqHelp.DiscountTotalCount;
-                int applylDiscountCount = reqHelp.DiscountApplyCount ?? 0;
                 if (query.RequestHelpDetail != null)
                 {
                     foreach (RequestHelpDatailPutParam requestDetail in query.RequestHelpDetail)
                     {
                         var existingDetail = reqHelp.HelpDetails.FirstOrDefault(x => x.Id == requestDetail.Id);
-                        if (existingDetail != null)
+                        if (existingDetail != null) //세부내용
                         {
-                            existingDetail.HelperMemberId = requestDetail.HelperMemId ?? existingDetail.HelperMemberId;
+                            //HelperMemberId 가 0으로 들어오면 삭제
+                            existingDetail.HelperMemberId = requestDetail.HelperMemId.HasValue ?( requestDetail.HelperMemId == 0 ? null : requestDetail.HelperMemId) : existingDetail.HelperMemberId;                           
                             existingDetail.DiscountApplyDate = requestDetail.DiscountApplyDate ?? existingDetail.DiscountApplyDate;
                             existingDetail.ReqDetailStatus = requestDetail.Status ?? existingDetail.ReqDetailStatus;
                             existingDetail.DiscountApplyType = requestDetail.DiscountApplyType ?? existingDetail.DiscountApplyType;
-                            if (existingDetail.ReqDetailStatus == ReqDetailStatus.Completed)
-                            {
-                                applylDiscountCount++;
-                                existingDetail.DiscountApplyDate = DateTimeOffset.UtcNow;
-                            }
-                            else if (existingDetail.ReqDetailStatus == ReqDetailStatus.Waiting && existingDetail.HelperMemberId.HasValue && existingDetail.HelperMemberId != 0)
+                        
+                            if (existingDetail.ReqDetailStatus == ReqDetailStatus.Waiting && existingDetail.HelperMemberId.HasValue && existingDetail.HelperMemberId != 0)
                             {
                                 existingDetail.ReqDetailStatus = ReqDetailStatus.Check;
                             }
                         }
                     }
-
-                    reqHelp.DiscountApplyCount = applylDiscountCount;
-
-                    if (requestTotalDisCountCount <= applylDiscountCount)
-                    {
-                        reqHelp.Status = HelpStatus.Completed;
-                    }
-                    else if(applylDiscountCount > 0)
-                    {
-                        reqHelp.Status = HelpStatus.Check;
-                    }
-                    else
-                    {
-                        reqHelp.Status =HelpStatus.Waiting;
-                    }
-
-                    reqHelp.Status = query.Status ?? reqHelp.Status;
                 }
-                reqHelp.DiscountApplyCount = applylDiscountCount;
-                reqHelp.DiscountApplyCount = query.DiscountApplyCount ?? reqHelp.DiscountApplyCount;
+                reqHelp.Status = query.Status ?? reqHelp.Status;
                 _context.ReqHelps.Update(reqHelp);
 
                 await _context.SaveChangesAsync();
@@ -459,6 +437,74 @@ namespace ParkingHelp.Controllers
             }
         }
 
+
+        [HttpPut("ReqHelpDetail")]
+        public async Task<IActionResult> PutRequestHelpDetailMultiUpdate([FromBody] PutRequestHelpDetailMultiUpdateParam param)
+        {
+            try
+            {
+                int updateReqId = param.ReqId;
+
+                var reqHelp = await _context.ReqHelps
+                .Include(r => r.HelpReqMember)
+                .ThenInclude(m => m.Cars)
+                .Include(r => r.HelpDetails).FirstOrDefaultAsync(x => x.Id == updateReqId);
+
+                if (reqHelp == null)
+                {
+                    JObject jResult = GetErrorJobject($"id : {updateReqId} 값에 해당되는 요청 값이 없습니다 ", "");
+                    return NotFound(jResult.ToString());
+                }
+                else
+                {
+                    
+                    List<ReqHelpDetailModel> helpDetailModels = reqHelp.HelpDetails.OrderBy(x => x.Id).ToList();
+                    
+                    foreach (var ReqHelpDetailModel in helpDetailModels.Where(d => d.ReqDetailStatus == param.UpdateTargetReqDetailStatus))
+                    {
+                        ReqHelpDetailModel.DiscountApplyDate = param.RequestHelpDatailPutParam.DiscountApplyDate ?? ReqHelpDetailModel.DiscountApplyDate;
+                        ReqHelpDetailModel.DiscountApplyType = param.RequestHelpDatailPutParam.DiscountApplyType ?? ReqHelpDetailModel.DiscountApplyType;
+                        ReqHelpDetailModel.ReqDetailStatus = param.RequestHelpDatailPutParam.Status ?? ReqHelpDetailModel.ReqDetailStatus;
+
+                        if (param.RequestHelpDatailPutParam.HelperMemId.HasValue)
+                        {
+                            ReqHelpDetailModel.HelperMemberId = param.RequestHelpDatailPutParam.HelperMemId == 0 ? null : param.RequestHelpDatailPutParam.HelperMemId;
+                        }
+                    }
+                    await _context.SaveChangesAsync();
+                }
+
+                var reqHelpDetail = await _context.ReqHelpsDetail
+                .Include(r => r.ReqHelps)
+                .Include(r => r.HelperMember)
+                .Where(x => x.Id == updateReqId)
+                .Select(r => new ReqHelpDetailDto
+                {
+                    Id = r.Id,
+                    ReqDetailStatus = r.ReqDetailStatus,
+                    DiscountApplyDate = r.DiscountApplyDate,
+                    DiscountApplyType = r.DiscountApplyType,
+                    InsertDate = r.InsertDate,
+                    SlackThreadTs = r.SlackThreadTs,
+                    Helper = r.HelperMember == null ? null : new HelpMemberDto
+                    {
+                        Id = r.HelperMember.Id,
+                        Name = r.HelperMember.MemberName,
+                        Email = r.HelperMember.Email,
+                    },
+                })
+                .OrderBy(x => x.Id)
+                .ToListAsync();
+                return Ok(reqHelpDetail);
+            }
+            catch (Exception ex)
+            {
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
+        }
+
+
         [HttpPut("ReqHelpDetail/{RequestDetailId}")]
         public async Task<IActionResult> PutRequestHelpDetail(int RequestDetailId, [FromQuery] RequestHelpDetailPutParam param)
         {
@@ -476,7 +522,8 @@ namespace ParkingHelp.Controllers
                 }
                 else
                 {
-                    updateTarget.HelperMemberId = param.HelperMemId.HasValue ? param.HelperMemId : updateTarget.HelperMemberId;
+                    updateTarget.HelperMemberId = param.HelperMemId.HasValue ? (param.HelperMemId == 0 ? null : param.HelperMemId) : updateTarget.HelperMemberId;
+                    
                     updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
                     updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
