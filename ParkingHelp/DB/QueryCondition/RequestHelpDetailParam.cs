@@ -24,6 +24,9 @@ namespace ParkingHelp.DB.QueryCondition
         public ReqDetailStatus UpdateTargetReqDetailStatus { get; set; }
         [SwaggerSchema("일괄 수정할 갯수 ", Format = "int")]
         public int? UpdateTargetCount { get; set; }
+
+        [SwaggerSchema("일괄 수정할 Detail ID값 ", Format = "int")]
+        public List<int>? UpdateTargetIdList { get; set; }
         [SwaggerSchema("일괄 변경할 내용")]
         public RequestHelpDatailMultiPutParam RequestHelpDatailPutParam { get; set; } = null!;
     }

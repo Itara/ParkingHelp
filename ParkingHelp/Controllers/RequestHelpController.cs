@@ -458,7 +458,13 @@ namespace ParkingHelp.Controllers
                 else
                 {
                     reqHelp.DiscountApplyCount = param.DiscountApplyCount ?? reqHelp.DiscountApplyCount;
-                    List<ReqHelpDetailModel> helpDetailModels = helpDetailModels = reqHelp.HelpDetails.Where(x => x.ReqDetailStatus == param.UpdateTargetReqDetailStatus).OrderBy(x => x.Id).Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue).ToList();
+                    var helpDetailModels = reqHelp.HelpDetails
+                      .Where(x => x.ReqDetailStatus == param.UpdateTargetReqDetailStatus &&
+                                  (param.UpdateTargetIdList == null || param.UpdateTargetIdList.Count == 0 || param.UpdateTargetIdList.Contains(x.Id)))
+                      .OrderBy(x => x.Id)
+                      .Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue)
+                      .ToList();
+
 
                     foreach (var ReqHelpDetailModel in helpDetailModels)
                     {
