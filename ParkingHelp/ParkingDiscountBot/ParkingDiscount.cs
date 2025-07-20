@@ -1,4 +1,5 @@
 ﻿using log4net;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Playwright;
 using Newtonsoft.Json.Linq;
 using NuGet.ProjectModel;
@@ -13,9 +14,11 @@ namespace ParkingHelp.ParkingDiscountBot
     {
         private static IPlaywright _playwright;
         private static IBrowser _browser;
+        private static IBrowserContext _context;  // 전역 context 추가
+
         private static Channel<(string carNumber, TaskCompletionSource<JObject> tcs)> _queue = Channel.CreateUnbounded<(string, TaskCompletionSource<JObject>)>();
-        private static SlackNotifier _slackNotifier;
-        public static void Initialize(SlackNotifier slack)
+
+        public static void Initialize()
         {
             _ = Task.Run(async () =>
             {
@@ -25,7 +28,7 @@ namespace ParkingHelp.ParkingDiscountBot
                     Headless = true,
                     Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 });
-                _slackNotifier = slack;
+                _context = await _browser.NewContextAsync();
                 await foreach (var (carNumber, tcs) in _queue.Reader.ReadAllAsync())
                 {
                     try
@@ -47,7 +50,6 @@ namespace ParkingHelp.ParkingDiscountBot
 
         public static Task<JObject> EnqueueAsync(string carNumber)
         {
-            Channel.CreateBounded<(string, TaskCompletionSource<JObject>)>(new BoundedChannelOptions(100) { FullMode = BoundedChannelFullMode.Wait });
             var tcs = new TaskCompletionSource<JObject>();
             _queue.Writer.TryWrite((carNumber, tcs));
             return tcs.Task;
@@ -55,17 +57,13 @@ namespace ParkingHelp.ParkingDiscountBot
 
         private static async Task<JObject> RunDiscountAsync(string carNumber)
         {
-            var context = await _browser.NewContextAsync();
-            var page = await context.NewPageAsync();
-
-            var result = await RegisterParkingDiscountAsync(carNumber);
-
+            var page = await _context.NewPageAsync(); // context 재사용
+            var result = await RegisterParkingDiscountAsync(carNumber, page);
             await page.CloseAsync();
-            await context.CloseAsync();
             return result;
         }
 
-        public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, bool notifySlackChannel = false)
+        public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, IPage page, bool notifySlackChannel = false)
         {
             JObject jobReturn = new JObject
             {
@@ -74,28 +72,34 @@ namespace ParkingHelp.ParkingDiscountBot
             };
             try
             {
-                
-                var context = await _browser.NewContextAsync();
-                var page = await context.NewPageAsync();
-
                 Console.WriteLine("로그인 페이지 이동 중...");
+                if(page.Url.Contains("login"))
+
+               Console.WriteLine("로그인 필요 → 로그인 시작");
+
                 await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
                 {
                     WaitUntil = WaitUntilState.NetworkIdle
                 });
-                await page.ScreenshotAsync(new() { Path = "crash_check.png" });
-                // 입력 대기 후 아이디, 비밀번호 채우기
-                await page.WaitForSelectorAsync("#id");
-                await page.FillAsync("#id", "C2115");
-                await page.FillAsync("#password", "6636");
 
-                // 로그인 버튼 클릭
-                await page.ClickAsync("#loginBtn");
+                if (page.Url.Contains("login")) //로그인 이후 자동으로 메인페이지 리다이렉트됨
+                {
+                    await page.WaitForSelectorAsync("#id");
+                    await page.FillAsync("#id", "C2115");
+                    await page.FillAsync("#password", "6636");
+                    await page.ClickAsync("#loginBtn");
+                    await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+                    Console.WriteLine("로그인 완료");
+                }
+                else
+                {
+                    await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/discount-search/original", new()
+                    {
+                        WaitUntil = WaitUntilState.NetworkIdle
+                    });
+                }
 
                 // 로그인 후 URL 또는 특정 요소 대기 (필요시 수정)
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-
-                Console.WriteLine(" 로그인 완료! .");
                 // 1. 차량번호 텍스트박스 입력
                 await page.FillAsync("#carNo", $"{carNumber}");
                 await page.ClickAsync("#btnCarSearch");
@@ -184,7 +188,7 @@ namespace ParkingHelp.ParkingDiscountBot
                                 Console.WriteLine($"할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
 
                                 jobReturn["Result"] = "OK";
-                                jobReturn["ReturnMessage"] = $"할인권 적용 후 주차금액: {feeValue}원 => {feeValueAfter}원";
+                                jobReturn["ReturnMessage"] = $"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다. 할인권 적용 후 주차금액: {feeValue}원 => {feeValueAfter}원";
 
                             }
                             else
@@ -214,14 +218,9 @@ namespace ParkingHelp.ParkingDiscountBot
                         {
                             jobReturn["Result"] = "OK";
                             jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
-                            await _slackNotifier.SendMessageAsync($"차량번호:[{carNum}]는 주차요금이 0원입니다. ", null);
                             Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
                         }
 
-                        if (notifySlackChannel && jobReturn["Result"]!.ToString() == "OK")
-                        {
-                            await _slackNotifier.SendMessageAsync($"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다.{jobReturn["ReturnMessage"]}", null);
-                        }
                     }
                     else if (carNoList.Count > 1)
                     {
@@ -240,17 +239,29 @@ namespace ParkingHelp.ParkingDiscountBot
                         jobReturn = new JObject
                         {
                             ["Result"] = "Fail",
-                            ["ReturnMessage"] = $"차량번호:{carNumber}는 미등록 차량입니다."
+                            ["ReturnMessage"] = $"차량번호 {carNumber}는 미등록 차량입니다."
                         };
                     }
                 }
             }
+            catch (PlaywrightException ex)
+            {
+                if (ex.Message.Contains("Browser has been closed"))
+                {
+                    try { await _browser?.CloseAsync(); } catch { }
+                    Initialize();
+                }
+                jobReturn["ReturnMessage"] = "Playwright 예외 발생: " + ex.Message;
+            }
             catch (Exception ex)
             {
-                jobReturn["ReturnMessage"] = ex.Message;
+              jobReturn["ReturnMessage"] = ex.Message;
+            }
+            finally
+            {
+                await page.CloseAsync(); // 메모리 누수 방지
             }
             return jobReturn;
-
         }
     }
 

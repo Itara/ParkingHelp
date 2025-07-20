@@ -635,11 +635,11 @@ namespace ParkingHelp.Controllers
                         .Include(r => r.ReqHelps)
                         .Include(r => r.HelperMember)
                         .Where(x => x.Id == RequestDetailId).First();
-                    int reqId = deleteReqHelpDetail.Req_Id;
-                    _context.ReqHelpsDetail.Remove(deleteReqHelpDetail);
 
+                    int reqId = deleteReqHelpDetail.Req_Id;
                     var updateReqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == reqId);
 
+                    _context.ReqHelpsDetail.Remove(deleteReqHelpDetail);
                     if (updateReqHelp != null)
                     {
                         if (updateReqHelp.DiscountTotalCount == updateReqHelp.DiscountApplyCount)

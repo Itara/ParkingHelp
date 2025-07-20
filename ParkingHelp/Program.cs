@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 using Microsoft.Playwright;
 using ParkingHelp.DB;
 using ParkingHelp.Models;
+using ParkingHelp.ParkingDiscountBot;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
 using System.Reflection;
@@ -75,7 +76,6 @@ builder.Services.AddSwaggerGen(c =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -95,7 +95,10 @@ if (!Directory.Exists(logDirectory))
     Directory.CreateDirectory(logDirectory);
 }
 var log = LogManager.GetLogger(typeof(Program));
+log.Info("Slack초기화");
+
+var slackOptions = app.Services.GetRequiredService<SlackOptions>();
+var slackNotifier = new SlackNotifier(slackOptions);
+PlaywrightManager.Initialize();
 log.Info("서버 시작 준비 완료");
-
-
 app.Run();
