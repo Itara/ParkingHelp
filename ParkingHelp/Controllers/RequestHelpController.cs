@@ -647,33 +647,59 @@ namespace ParkingHelp.Controllers
                             updateReqHelp.DiscountApplyCount -= 1;
                         }
                         updateReqHelp.DiscountTotalCount -= 1;
-                        
+
                         if (updateReqHelp.DiscountTotalCount < 1)
                         {
                             _context.ReqHelps.Remove(updateReqHelp);
-                            returnJob = new JObject
-                            {
-                                { "Result", "Success" },
-                                { "RequestDetail", "할인권 적용 요청이 0개이므로 해당 할인권적용 요청건은 삭제했습니다" },
-                                { "RemoveReqHelp", true }
-                            };
                         }
                         else
                         {
                             _context.ReqHelps.Update(updateReqHelp);
-                            returnJob = new JObject
-                            {
-                                { "Result", "Success" },
-                                { "RequestDetail", $"할인권 요청이 {updateReqHelp.DiscountTotalCount}개 남았습니다" },
-                                { "RemoveReqHelp", false }
-                            };
                         }
-
                         await _context.SaveChangesAsync();
                     }
 
+                    var returnReqHelp = await _context.ReqHelps.Where(r => r.Id == reqId)
+                                      .Include(r => r.HelpReqMember)
+                                          .ThenInclude(m => m.Cars)
+                                      .Include(r => r.HelpDetails)
+                                      .Select(r => new ReqHelpDto
+                                      {
+                                          Id = r.Id,
+                                          ReqDate = r.ReqDate,
+                                          Status = r.Status,
+                                          TotalDisCount = r.DiscountTotalCount,
+                                          ApplyDisCount = r.DiscountApplyCount, // 적용 수량은 추후 계산 or 외부 값
+                                          HelpRequester = new HelpRequesterDto
+                                          {
+                                              Id = r.HelpReqMember.Id,
+                                              HelpRequesterName = r.HelpReqMember.MemberName,
+                                              RequesterEmail = r.HelpReqMember.Email,
+                                              ReqHelpCar = new ReqHelpCarDto
+                                              {
+                                                  Id = r.HelpReqMember.Cars.First().Id,
+                                                  CarNumber = r.HelpReqMember.Cars.First().CarNumber
+                                              }
+                                          },
+                                          HelpDetails = r.HelpDetails.Select(d => new ReqHelpDetailDto
+                                          {
+                                              Id = d.Id,
+                                              ReqDetailStatus = d.ReqDetailStatus,
+                                              DiscountApplyDate = d.DiscountApplyDate,
+                                              DiscountApplyType = d.DiscountApplyType,
+                                              InsertDate = d.InsertDate,
+                                              SlackThreadTs = d.SlackThreadTs,
+                                              Helper = d.HelperMember == null ? null : new HelpMemberDto
+                                              {
+                                                  Id = d.HelperMember.Id,
+                                                  Name = d.HelperMember.MemberName,
+                                                  Email = d.HelperMember.Email,
+                                                  SlackId = d.HelperMember.SlackId
+                                              }
+                                          }).ToList()
+                                      }).ToListAsync();
+                    return Ok(returnReqHelp);
 
-                    return Ok(returnJob.ToString());
                 }
                 else
                 {
