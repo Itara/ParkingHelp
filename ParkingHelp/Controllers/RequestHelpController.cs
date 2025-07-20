@@ -457,7 +457,7 @@ namespace ParkingHelp.Controllers
                 }
                 else
                 {
-                    reqHelp.DiscountApplyCount = param.DiscountApplyCount?? reqHelp.DiscountApplyCount;
+                    reqHelp.DiscountApplyCount = param.DiscountApplyCount ?? reqHelp.DiscountApplyCount;
                     List<ReqHelpDetailModel> helpDetailModels = helpDetailModels = reqHelp.HelpDetails.OrderBy(x => x.Id).Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue).ToList();
 
                     foreach (var ReqHelpDetailModel in helpDetailModels)
@@ -549,34 +549,49 @@ namespace ParkingHelp.Controllers
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
                     updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
                     _context.ReqHelpsDetail.Update(updateTarget);
+
                     var updateReqHelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
-                    updateReqHelp.DiscountApplyCount = param.DisApplyCount;
+
+                    updateReqHelp.DiscountApplyCount = param.DisCountApplyCount ?? updateReqHelp.DiscountApplyCount;
 
                     await _context.SaveChangesAsync();
                 }
 
-                var reqHelpDetail = await _context.ReqHelpsDetail
-                .Include(r => r.ReqHelps)
-                .Include(r => r.HelperMember)
-                .Where(x => x.Id == RequestDetailId)
-                .Select(r => new ReqHelpDetailDto
-                {
-                    Id = r.Id,
-                    ReqDetailStatus = r.ReqDetailStatus,
-                    DiscountApplyDate = r.DiscountApplyDate,
-                    DiscountApplyType = r.DiscountApplyType,
-                    InsertDate = r.InsertDate,
-                    SlackThreadTs = r.SlackThreadTs,
-                    Helper = r.HelperMember == null ? null : new HelpMemberDto
-                    {
-                        Id = r.HelperMember.Id,
-                        Name = r.HelperMember.MemberName,
-                        Email = r.HelperMember.Email,
-                    },
-                })
-                .OrderBy(x => x.Id)
-                .ToListAsync();
-                return Ok(reqHelpDetail);
+                var returnReqHelp = await _context.ReqHelps.Where(r => r.Id == updateTarget.Req_Id) 
+                                        .Include(r => r.HelpReqMember)
+                                            .ThenInclude(m => m.Cars)
+                                        .Include(r => r.HelpDetails)
+                                        .Select(r => new ReqHelpDto
+                                        {
+                                            Id = r.Id,
+                                            ReqDate = r.ReqDate,
+                                            Status = r.Status,
+                                            TotalDisCount = r.DiscountTotalCount,
+                                            ApplyDisCount = r.DiscountApplyCount, // 적용 수량은 추후 계산 or 외부 값
+                                            HelpRequester = new HelpRequesterDto
+                                            {
+                                                Id = r.HelpReqMember.Id,
+                                                HelpRequesterName = r.HelpReqMember.MemberName,
+                                                RequesterEmail = r.HelpReqMember.Email,
+                                                ReqHelpCar = new ReqHelpCarDto
+                                                {
+                                                    Id = r.HelpReqMember.Cars.First().Id,
+                                                    CarNumber = r.HelpReqMember.Cars.First().CarNumber
+                                                }
+                                            },
+                                            HelpDetails = r.HelpDetails.Where(d => d.Id == RequestDetailId).Select(d => new ReqHelpDetailDto
+                                            {
+                                                Id = d.Id,
+                                                ReqDetailStatus = d.ReqDetailStatus,
+                                                DiscountApplyDate = d.DiscountApplyDate,
+                                                DiscountApplyType =d.DiscountApplyType,
+                                                InsertDate = d.InsertDate,
+                                                SlackThreadTs = d.SlackThreadTs
+                                            }).ToList()
+                                        })
+                                        .ToListAsync();
+
+                return Ok(returnReqHelp);
             }
             catch (Exception ex)
             {
