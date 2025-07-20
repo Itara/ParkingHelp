@@ -56,7 +56,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [HttpGet("/CheckParkingFee")]
+        [HttpGet("CheckParkingFee")]
         public async Task<IActionResult> GetDiscountParkingFee([FromQuery] int MemberId)
         {
             var member = await _context.Members.Include(m => m.Cars).FirstOrDefaultAsync(m => m.Id == MemberId);
@@ -81,7 +81,7 @@ namespace ParkingHelp.Controllers
                 }).ToList()
             };
 
-            JObject result = await PlaywrightManager.EnqueueAsync(memberDto.Cars.First().CarNumber, DiscountJobType.ApplyDiscount);
+            JObject result = await PlaywrightManager.EnqueueAsync(memberDto.Cars.First().CarNumber, DiscountJobType.CheckFeeOnly);
 
             if (result != null)
             {
