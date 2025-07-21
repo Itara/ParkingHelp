@@ -573,6 +573,23 @@ namespace ParkingHelp.Controllers
                     _context.ReqHelpsDetail.Update(updateTarget);
 
                     await _context.SaveChangesAsync();
+
+                    rephelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
+                    var details = await _context.ReqHelpsDetail
+                     .Include(r => r.ReqHelps)
+                     .Include(r => r.HelperMember)
+                     .Where(x => x.Req_Id == rephelp.Id).ToListAsync();
+
+                    int applycount = 0;
+
+                    foreach(var item in details)
+                    {
+                        if(item.ReqDetailStatus != ReqDetailStatus.Waiting)
+                        {
+                            applycount++;
+                        }
+                    }
+                    rephelp.DiscountApplyCount = applycount;
                 }
 
                 var returnReqHelp = await _context.ReqHelps.Where(r => r.Id == updateTarget.Req_Id)
