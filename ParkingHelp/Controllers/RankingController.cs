@@ -35,15 +35,14 @@ namespace ParkingHelp.Controllers
                 var helpOfferData = await _context.HelpOffersDetail
                 .Where(d => d.ReqDetailStatus == ReqDetailStatus.Completed
                             && d.HelpOffer.HelperMember != null
-                            && d.RequestMember != null
-                            && d.DiscountApplyDate != null)
+                            && d.RequestMember != null)
                 .Select(d => new
                 {
                     HelperId = d.HelpOffer.HelperMember.Id,
                     HelperName = d.HelpOffer.HelperMember.MemberName,
                     RequestMemberId = d.RequestMember!.Id,
                     DiscountApplyType = d.DiscountApplyType,
-                    DiscountApplyDate = d.DiscountApplyDate!.Value,
+                    DiscountApplyDate = d.DiscountApplyDate == null ? DateTimeOffset.UtcNow : d.DiscountApplyDate.Value,
                     ReqId = d.Id
                 })
                 .ToListAsync();
@@ -78,7 +77,6 @@ namespace ParkingHelp.Controllers
                 var reqHelpData = await _context.ReqHelpsDetail
                 .Where(d => d.ReqDetailStatus == ReqDetailStatus.Completed
                             && d.HelperMember != null
-                            && d.DiscountApplyDate != null
                             && d.ReqHelps.HelpReqMember != null)
                 .Select(d => new
                 {
@@ -86,7 +84,7 @@ namespace ParkingHelp.Controllers
                     HelperName = d.HelperMember.MemberName,
                     RequestMemberId = d.ReqHelps.HelpReqMember.Id,
                     DiscountApplyType = d.DiscountApplyType,
-                    DiscountApplyDate = d.DiscountApplyDate!.Value,
+                    DiscountApplyDate = d.DiscountApplyDate == null ?DateTimeOffset.UtcNow: d.DiscountApplyDate.Value,
                     ReqId = d.Id
                 })
                 .ToListAsync();

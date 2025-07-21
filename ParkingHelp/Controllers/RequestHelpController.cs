@@ -564,6 +564,9 @@ namespace ParkingHelp.Controllers
                             case ReqDetailStatus.Check:
                                 rephelp.DiscountApplyCount = rephelp.DiscountApplyCount >= rephelp.DiscountTotalCount ? rephelp.DiscountTotalCount : rephelp.DiscountApplyCount + 1;
                                 break;
+                            case ReqDetailStatus.Completed:
+                                rephelp.DiscountApplyCount = rephelp.DiscountApplyCount >= rephelp.DiscountTotalCount ? rephelp.DiscountTotalCount : rephelp.DiscountApplyCount + 1;
+                                break;
                         }
                     }
                      
