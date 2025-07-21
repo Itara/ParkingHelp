@@ -80,11 +80,13 @@ namespace ParkingHelp.Controllers
                                     HelpRequesterName = d.RequestMember.MemberName,
                                     RequesterEmail = d.RequestMember.Email,
                                     SlackId = d.RequestMember.SlackId,
-                                    ReqHelpCar = d.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                                    ReqHelpCar = d?.RequestMember?.Cars?
+                                    .Select(c => new ReqHelpCarDto
                                     {
                                         Id = c.Id,
                                         CarNumber = c.CarNumber
-                                    }).FirstOrDefault()
+                                    })
+                                    .FirstOrDefault()
                                 }
                             }
                                     }
