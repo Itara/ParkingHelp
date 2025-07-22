@@ -224,7 +224,7 @@ namespace ParkingHelp.Controllers
 
                             //if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
                             
-                            if (detail.ReqMemberId.HasValue && existing.ReqDetailStatus != ReqDetailStatus.Completed)
+                            if (detail.ReqMemberId.HasValue && detail.Status != ReqDetailStatus.Completed)
                             {
                                 Logs.Info($"업데이트 전  existing.RequestMemberId: {existing.RequestMemberId}");
                                 Logs.Info($"업데이트 전  detail.ReqMemberId: {detail.ReqMemberId}");
