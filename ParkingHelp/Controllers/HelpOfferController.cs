@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.DTO;
+using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 
@@ -222,7 +223,8 @@ namespace ParkingHelp.Controllers
                                 continue;
 
                             //if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
-                            if (detail.ReqMemberId.HasValue)
+                            Logs.Info($"Updating HelpOfferDetail with ID: {detail.Id}");
+                            if (detail.ReqMemberId.HasValue && existing.ReqDetailStatus != ReqDetailStatus.Completed)
                             {
                                 existing.RequestMemberId = detail.ReqMemberId == 0 ? null : detail.ReqMemberId;
                             }
@@ -302,7 +304,7 @@ namespace ParkingHelp.Controllers
                                 {
                                     Id = c.Id,
                                     CarNumber = c.CarNumber
-                                }).FirstOrDefault()
+                                }).FirstOrDefault() 
                             }
                         }).ToList()
                     };

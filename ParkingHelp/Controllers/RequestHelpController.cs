@@ -28,7 +28,7 @@ namespace ParkingHelp.Controllers
         {
             _context = context;
             _slackNotifier = new SlackNotifier(slackOptions);
-            Logs.Info("asdasdsad");
+          
         }
 
         /// <summary>
