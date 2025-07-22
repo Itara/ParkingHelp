@@ -228,6 +228,7 @@ namespace ParkingHelp.Controllers
                             {
                                 Logs.Info($"Updating existing.RequestMemberId: {existing.RequestMemberId}");
                                 existing.RequestMemberId = detail.ReqMemberId == 0 ? null : detail.ReqMemberId;
+                                Logs.Info($"Updating existing.RequestMemberId: {existing.RequestMemberId}");
                             }
                             var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
 
