@@ -222,15 +222,9 @@ namespace ParkingHelp.Controllers
                             if (!existingDetails.TryGetValue(detail.Id, out var existing))
                                 continue;
 
-                            //if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
-                            Logs.Info($"1 existing.RequestMemberId: {existing.RequestMemberId}");
-                            Logs.Info($"2 : {detail.ReqMemberId}");
                             if (detail.ReqMemberId.HasValue && detail.Status != ReqDetailStatus.Completed)
                             {
-                                Logs.Info($"업데이트 전  existing.RequestMemberId: {existing.RequestMemberId}");
-                                Logs.Info($"업데이트 전  detail.ReqMemberId: {detail.ReqMemberId}");
                                 existing.RequestMemberId = detail.ReqMemberId == 0 ? null : detail.ReqMemberId;
-                                Logs.Info($"업데이트 이후 existing.RequestMemberId: {existing.RequestMemberId}");
                             }
                             var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
 
