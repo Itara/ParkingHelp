@@ -569,10 +569,23 @@ namespace ParkingHelp.Controllers
                     }
 
                     _context.ReqHelpsDetail.Update(updateTarget);
-                    await _context.SaveChangesAsync();
+                    await _context.SaveChangesAsync(); //요청 세부사항 DB에 반영
 
                     int applyCount = _context.ReqHelpsDetail.Where(x => x.Req_Id == updateTarget.Req_Id && x.ReqDetailStatus != ReqDetailStatus.Waiting).Count(); //현재 남아있는 ReqHelpDetail의 개수 중 적용된 개수를 가져옴
                     rephelp.DiscountApplyCount = applyCount;
+                    if(rephelp.DiscountTotalCount == applyCount)
+                    {
+                        rephelp.Status = HelpStatus.Completed; //모든 요청이 완료되면 상태를 Completed로 변경
+                    }
+                    else if(applyCount != 0 && applyCount < rephelp.DiscountTotalCount)
+                    {
+                        rephelp.Status = HelpStatus.Check;
+                    }
+                    else
+                    {
+                        rephelp.Status = HelpStatus.Waiting; //1건도 적용되지 않은 상태
+                    }
+
                     await _context.SaveChangesAsync();
                 }
 
@@ -656,9 +669,10 @@ namespace ParkingHelp.Controllers
                     updateReqHelp.DiscountApplyCount = applyCount;
                     _context.ReqHelps.Update(updateReqHelp);
                 }
-                else if (updateReqHelp != null)//ReqHelpDetail이 하나도 남아있지 않으면 ReqHelp를 삭제
+                else if (totalCount == 0 && updateReqHelp != null)//ReqHelpDetail이 하나도 남아있지 않으면 ReqHelp를 삭제
                 {
                     _context.ReqHelps.Remove(updateReqHelp);
+                    await _context.SaveChangesAsync();
                     return Ok(new List<ReqHelpDto>());
                 }
                 else

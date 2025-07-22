@@ -40,7 +40,7 @@ namespace ParkingHelp.Controllers
                 .Include(o => o.HelpDetails)
                     .ThenInclude(d => d.RequestMember)
                         .ThenInclude(m => m.Cars)
-                .ToListAsync();
+                .OrderBy(o => o.Id).ToListAsync();
 
                 // 이후 메모리에서 DTO 조립
                 var result = helpOffers
@@ -208,7 +208,7 @@ namespace ParkingHelp.Controllers
                         }).ToList()
                     }).ToList(),
                     HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id) ? groupedByMember[m.Id] : new List<MyHelpOfferDTO>()
-                }).ToListAsync();
+                }).OrderBy(o => o.Id).ToListAsync();
 
                 //foreach(MemberDto memberDto in memberDtos)
                 //{
