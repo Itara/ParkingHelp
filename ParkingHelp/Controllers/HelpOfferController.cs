@@ -223,9 +223,10 @@ namespace ParkingHelp.Controllers
                                 continue;
 
                             //if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
-                            Logs.Info($"Updating HelpOfferDetail with ID: {detail.Id}");
+                            Logs.Info($"Updating HelpOfferDetail with ID: {detail.ReqMemberId}");
                             if (detail.ReqMemberId.HasValue && existing.ReqDetailStatus != ReqDetailStatus.Completed)
                             {
+                                Logs.Info($"Updating existing.RequestMemberId: {existing.RequestMemberId}");
                                 existing.RequestMemberId = detail.ReqMemberId == 0 ? null : detail.ReqMemberId;
                             }
                             var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
