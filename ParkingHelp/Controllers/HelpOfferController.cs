@@ -223,12 +223,13 @@ namespace ParkingHelp.Controllers
                                 continue;
 
                             //if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
-                            Logs.Info($"Updating HelpOfferDetail with ID: {detail.ReqMemberId}");
+                            
                             if (detail.ReqMemberId.HasValue && existing.ReqDetailStatus != ReqDetailStatus.Completed)
                             {
-                                Logs.Info($"Updating existing.RequestMemberId: {existing.RequestMemberId}");
+                                Logs.Info($"업데이트 전  existing.RequestMemberId: {existing.RequestMemberId}");
+                                Logs.Info($"업데이트 전  detail.ReqMemberId: {detail.ReqMemberId}");
                                 existing.RequestMemberId = detail.ReqMemberId == 0 ? null : detail.ReqMemberId;
-                                Logs.Info($"Updating existing.RequestMemberId: {existing.RequestMemberId}");
+                                Logs.Info($"업데이트 이후 existing.RequestMemberId: {existing.RequestMemberId}");
                             }
                             var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
 
