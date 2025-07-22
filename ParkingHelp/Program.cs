@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Microsoft.Playwright;
 using ParkingHelp.DB;
+using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.ParkingDiscountBot;
 using ParkingHelp.SlackBot;
@@ -52,6 +53,7 @@ else
     });
 }
 
+
 // Add services to the container.
 Console.WriteLine($"Connection String is : {builder.Configuration.GetConnectionString("DefaultConnection")}");
 
@@ -94,11 +96,11 @@ if (!Directory.Exists(logDirectory))
 {
     Directory.CreateDirectory(logDirectory);
 }
-var log = LogManager.GetLogger(typeof(Program));
-log.Info("Slack초기화");
 
 var slackOptions = app.Services.GetRequiredService<SlackOptions>();
 var slackNotifier = new SlackNotifier(slackOptions);
 PlaywrightManager.Initialize();
-log.Info("서버 시작 준비 완료");
+Logs.Init();
+Logs.Info("Parking Helper Start...");
+
 app.Run();
