@@ -549,33 +549,24 @@ namespace ParkingHelp.Controllers
                 }
                 else
                 {
-                    ReqHelpModel rephelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
-                    
+                    ReqHelpModel? rephelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).FirstOrDefault();
+                    if (rephelp == null)
+                    {
+                        JObject jResult = GetErrorJobject($"id : {updateTarget.Req_Id} 값에 해당되는 요청 값이 없습니다 ", "");
+                        return NotFound(jResult.ToString());
+                    }
+
                     updateTarget.HelperMemberId = param.HelperMemId.HasValue ? (param.HelperMemId == 0 ? null : param.HelperMemId) : updateTarget.HelperMemberId;
                     updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
                     if (param.ReqDetailStatus.HasValue)
                     {
                         updateTarget.ReqDetailStatus = param.ReqDetailStatus.Value;
-                        switch (param.ReqDetailStatus.Value)
-                        {
-                            case ReqDetailStatus.Waiting:
-                                rephelp.DiscountApplyCount = rephelp.DiscountApplyCount > 0 ? rephelp.DiscountApplyCount - 1 : 0;
-                                break;
-                            case ReqDetailStatus.Check:
-                                rephelp.DiscountApplyCount = rephelp.DiscountApplyCount >= rephelp.DiscountTotalCount ? rephelp.DiscountTotalCount : rephelp.DiscountApplyCount + 1;
-                                break;
-                            case ReqDetailStatus.Completed:
-                                rephelp.DiscountApplyCount = rephelp.DiscountApplyCount >= rephelp.DiscountTotalCount ? rephelp.DiscountTotalCount : rephelp.DiscountApplyCount + 1;
-                                break;
-                        }
                     }
                      
                     _context.ReqHelpsDetail.Update(updateTarget);
-
                     await _context.SaveChangesAsync();
 
-                    rephelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
                     var details = await _context.ReqHelpsDetail
                      .Include(r => r.ReqHelps)
                      .Include(r => r.HelperMember)
