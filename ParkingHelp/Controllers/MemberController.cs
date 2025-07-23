@@ -207,7 +207,42 @@ namespace ParkingHelp.Controllers
                             }
                         }).ToList()
                     }).ToList(),
-                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id) ? groupedByMember[m.Id] : new List<MyHelpOfferDTO>()
+                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id) ? groupedByMember[m.Id] : new List<MyHelpOfferDTO>() ,
+                    MyRequestHelpCompleteHistory = m.HelpRequests.Select(req => new ReqHelpDto
+                    {
+                        Id = req.Id,
+                        ApplyDisCount = req.DiscountApplyCount,
+                        TotalDisCount = req.DiscountTotalCount,
+                        Status = req.Status,
+                        ReqDate = req.ReqDate,
+                        HelpRequester = new HelpRequesterDto
+                        {
+                            Id = req.HelpReqMember.Id,
+                            HelpRequesterName = req.HelpReqMember.MemberName,
+                            RequesterEmail = req.HelpReqMember.Email,
+                            SlackId = req.HelpReqMember.SlackId,
+                            ReqHelpCar = req.HelpReqMember.Cars.Select(c => new ReqHelpCarDto
+                            {
+                                Id = c.Id,
+                                CarNumber = c.CarNumber
+                            }).FirstOrDefault()
+                        },
+                        HelpDetails = req.HelpDetails.Where(x => x.ReqDetailStatus == ReqDetailStatus.Completed).Select(detail => new ReqHelpDetailDto
+                        {
+                            Id = detail.Id,
+                            ReqDetailStatus = detail.ReqDetailStatus,
+                            DiscountApplyDate = detail.DiscountApplyDate,
+                            DiscountApplyType = detail.DiscountApplyType,
+                            InsertDate = detail.InsertDate,
+                            Helper = detail.HelperMember == null ? null : new HelpMemberDto
+                            {
+                                Id = detail.HelperMemberId ?? 0,
+                                Name = detail.HelperMember.MemberName,
+                                Email = detail.HelperMember.Email,
+                                SlackId = detail.HelperMember.SlackId
+                            }
+                        }).ToList()
+                    }).ToList()
                 }).OrderBy(o => o.Id).ToListAsync();
 
                 //foreach(MemberDto memberDto in memberDtos)

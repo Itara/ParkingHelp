@@ -14,6 +14,8 @@
 
         public List<MyHelpOfferDTO>? HelpOfferMyRequestHistory { get; set; } //Login할때 기본적으로 d가져올 자신의 도움내역
 
+        public List<ReqHelpDto>? MyRequestHelpCompleteHistory { get; set; } //Login할때 기본적으로 가져올 자신의 요청내역(완료된것만)
+
     }
 
 }
