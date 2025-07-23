@@ -9,6 +9,7 @@ using ParkingHelp.DTO;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace ParkingHelp.Controllers
 {
@@ -49,7 +50,7 @@ namespace ParkingHelp.Controllers
                             .Where(d => d.RequestMemberId != null)
                             .Select(d => new
                             {
-                                RequestMemberId = d.RequestMemberId.Value,
+                                RequestMemberId = d.RequestMemberId!.Value, //위에서 null이 아닌 것만 필터링했으므로 안전하게 사용 가능
                                 Offer = new MyHelpOfferDTO
                                 {
                                     Id = offer.Id,
@@ -115,6 +116,7 @@ namespace ParkingHelp.Controllers
                         })
                         .ToList()
                 );
+
 
                 var memberDtos = await _context.Members.Where(m =>
                     (string.IsNullOrWhiteSpace(param.memberLoginId) || m.MemberLoginId.Contains(param.memberLoginId)) &&
@@ -207,8 +209,28 @@ namespace ParkingHelp.Controllers
                             }
                         }).ToList()
                     }).ToList(),
-                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id) ? groupedByMember[m.Id] : new List<MyHelpOfferDTO>() ,
-                    MyRequestHelpCompleteHistory = m.HelpRequests.Select(req => new ReqHelpDto
+                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id) ? groupedByMember[m.Id] : new List<MyHelpOfferDTO>() 
+                }).OrderBy(o => o.Id).ToListAsync();
+
+                var kstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul");
+                var nowKST = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, kstTimeZone);
+                var startOfTodayKST = new DateTimeOffset(nowKST.Date, kstTimeZone.GetUtcOffset(nowKST.Date));
+                var endOfTodayKST = startOfTodayKST.AddDays(1).AddSeconds(-1);
+
+                // UTC 변환
+                var startOfTodayUTC = startOfTodayKST.UtcDateTime;
+                var endOfTodayUTC = endOfTodayKST.UtcDateTime;
+
+
+                foreach (var memberDto in memberDtos)
+                {
+                    //myHelpRequest
+                    var myHelpRequests = await _context.ReqHelps
+                        .Include(r => r.HelpReqMember)
+                        .ThenInclude(m => m.Cars)
+                        .Include(r => r.HelpDetails)
+                        .Where(r => r.HelpDetails.Any(d => d.HelperMemberId == memberDto.Id && d.ReqDetailStatus == ReqDetailStatus.Completed && d.InsertDate >= startOfTodayUTC && d.InsertDate <= endOfTodayUTC)).ToListAsync();
+                    List<ReqHelpDto> tmpHistory = myHelpRequests.Select(req => new ReqHelpDto
                     {
                         Id = req.Id,
                         ApplyDisCount = req.DiscountApplyCount,
@@ -242,13 +264,10 @@ namespace ParkingHelp.Controllers
                                 SlackId = detail.HelperMember.SlackId
                             }
                         }).ToList()
-                    }).ToList()
-                }).OrderBy(o => o.Id).ToListAsync();
+                    }).ToList();
 
-                //foreach(MemberDto memberDto in memberDtos)
-                //{
-
-                //}
+                    memberDto.MyRequestHelpCompleteHistory = tmpHistory;
+                }
 
                 return Ok(memberDtos);
             }
