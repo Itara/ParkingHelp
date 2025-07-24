@@ -99,7 +99,9 @@ if (!Directory.Exists(logDirectory))
 
 var slackOptions = app.Services.GetRequiredService<SlackOptions>();
 var slackNotifier = new SlackNotifier(slackOptions);
-PlaywrightManager.Initialize();
+
+PlaywrightManager.Initialize(app.Services,builder.Configuration);
+
 Logs.Init();
 Logs.Info("Parking Helper Start...");
 

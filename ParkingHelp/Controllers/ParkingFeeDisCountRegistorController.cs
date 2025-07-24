@@ -31,7 +31,7 @@ namespace ParkingHelp.Controllers
         public async Task<IActionResult> PostDiscountParkingFee([FromBody] ParkingDiscountFeePostParam query)
         {
 
-            JObject result = await PlaywrightManager.EnqueueAsync(query.CarNumber, DiscountJobType.ApplyDiscount);
+            JObject result = await PlaywrightManager.EnqueueAsync(query.CarNumber, DiscountJobType.ApplyDiscount, (int)DiscountJobPriority.High);
 
             if (result != null)
             {
