@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using NuGet.ProjectModel;
 using ParkingHelp.DB;
 using ParkingHelp.DTO;
+using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
@@ -73,11 +74,12 @@ namespace ParkingHelp.ParkingDiscountBot
                     Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 });
                 _context = await _browser.NewContextAsync();
+                bool isOnlyFirstRun = true; //즉시 실행이면 한번만 실행한다 
                 while (true)
                 {
                     //배치시작시간
                     TimeOnly currentTime = TimeOnly.FromDateTime(DateTime.Now);
-                    if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) && _AutoDisCountApplyTime.Hour == currentTime.Hour && _AutoDisCountApplyTime.Minute == currentTime.Minute)
+                    if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) && _AutoDisCountApplyTime.Hour == currentTime.Hour && _AutoDisCountApplyTime.Minute == currentTime.Minute )
                     {
                         List<MemberDto> members = GetMemberList();
                         foreach (MemberDto meber in members)
@@ -89,6 +91,20 @@ namespace ParkingHelp.ParkingDiscountBot
                                 _ = EnqueueAsync(car.CarNumber, DiscountJobType.ApplyDiscount, 100 , memberEmail);
                             }
                         }
+                    }
+                    else if(_config["AutoDiscountTime"]!= null && _config["AutoDiscountTime"].ToUpper() == "NOW" && isOnlyFirstRun)
+                    {
+                        List<MemberDto> members = GetMemberList();
+                        foreach (MemberDto meber in members)
+                        {
+                            foreach (var car in meber.Cars)
+                            {
+                                //자동 할인권 적용 작업큐에 추가
+                                string memberEmail = meber.Email ?? string.Empty;
+                                _ = EnqueueAsync(car.CarNumber, DiscountJobType.ApplyDiscount, 100, memberEmail);
+                            }
+                        }
+                        Logs.Info("주차할인권 즉시 적용");
                     }
 
                     if (_ParkingDiscountPriorityQueue.Count == 0)
@@ -141,7 +157,16 @@ namespace ParkingHelp.ParkingDiscountBot
            Console.WriteLine($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} {e.MemberEmail}");
            _ =Task.Run(async () =>
            {
-               await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}", e.MemberEmail);
+               SlackUserByEmail? userInfo = await slackNotifier.FindUserByEmailAsync(e.MemberEmail);
+               if(userInfo!= null)
+               {
+                   await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}", userInfo.Id, null);
+               }
+               else
+               {
+                   await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}",null, null);
+               }
+                  
            });
         }
 

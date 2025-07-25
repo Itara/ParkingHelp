@@ -35,17 +35,29 @@ namespace ParkingHelp.SlackBot
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _botToken);
         }
 
-        public async Task<JObject> SendMessageAsync(string message,string? slackThreadTs = null)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message">전달할 메세지</param>
+        /// <param name="userId">사용자 고유 SlackID</param>
+        /// <param name="slackThreadTs">null일시 채팅 값이있으면 쓰레드 댓글</param>
+        /// <returns></returns>
+        public async Task<JObject> SendMessageAsync(string message,string userId,string? slackThreadTs = null)
         {
-            var payload = new
+           
+            JObject request  = new JObject
             {
-                channel = _sendChannelID,
-                text = message,
-                link_names = true,
-                thread_ts = string.IsNullOrEmpty(slackThreadTs) ? null : slackThreadTs
+                ["channel"] = _sendChannelID,
+                ["text"] = message,
+                ["link_names"] = true,
+                
             };
-            Console.WriteLine($"BotToken : {_botToken} , channel : {payload.channel} {payload.text}");
-            var json = JsonConvert.SerializeObject(payload, new JsonSerializerSettings
+            if (!string.IsNullOrEmpty(slackThreadTs))
+            {
+                request .Add("thread_ts", slackThreadTs);
+            }
+            Console.WriteLine($"BotToken : {_botToken} , channel : {request["channel"]} {request["message"]}");
+            var json = JsonConvert.SerializeObject(request, new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Ignore
             });
