@@ -78,6 +78,8 @@ namespace ParkingHelp.ParkingDiscountBot
                 _context = await _browser.NewContextAsync();
 
                 bool isOnlyFirstRun = true; //즉시 실행이면 한번만 실행한다 
+                string? autoDiscountTime = _config["AutoDiscountTime"];
+                Logs.Info($"자동 할인권 적용 시간 {autoDiscountTime ?? ""}");
                 while (true)
                 {
                     //배치시작시간
