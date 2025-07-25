@@ -74,6 +74,7 @@ namespace ParkingHelp.ParkingDiscountBot
                     Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 });
                 _context = await _browser.NewContextAsync();
+
                 bool isOnlyFirstRun = true; //즉시 실행이면 한번만 실행한다 
                 while (true)
                 {
@@ -104,6 +105,7 @@ namespace ParkingHelp.ParkingDiscountBot
                                 _ = EnqueueAsync(car.CarNumber, DiscountJobType.ApplyDiscount, 100, memberEmail);
                             }
                         }
+                        isOnlyFirstRun = false; //즉시 실행은 한번만 실행
                         Logs.Info("주차할인권 즉시 적용");
                     }
 
