@@ -42,7 +42,7 @@ namespace ParkingHelp.SlackBot
         /// <param name="userId">사용자 고유 SlackID</param>
         /// <param name="slackThreadTs">null일시 채팅 값이있으면 쓰레드 댓글</param>
         /// <returns></returns>
-        public async Task<JObject> SendMessageAsync(string message,string userId,string? slackThreadTs = null)
+        public async Task<JObject> SendMessageAsync(string message,string? slackThreadTs = null)
         {
            
             JObject request  = new JObject
