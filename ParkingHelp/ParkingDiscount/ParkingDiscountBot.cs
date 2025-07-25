@@ -161,14 +161,26 @@ namespace ParkingHelp.ParkingDiscountBot
             {
                 Logs.Info($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} ");
                 SlackUserByEmail? userInfo = await slackNotifier.FindUserByEmailAsync(e.MemberEmail);
-                if (userInfo != null)
+                switch (Convert.ToInt32(e.Result["ResultType"]))
                 {
-                    await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}", null);
+                    case (int)DisCountResultType.Success:
+                        Logs.Info($"차량번호: {carNumber} 할인권 적용 성공");
+                        break;
+                    case (int)DisCountResultType.SuccessButFee:
+                        await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}", null);
+                        break;
+                    case (int)DisCountResultType.MoreThanTwoCar:
+                        await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: 차량정보가 2대 이상입니다.", null);
+                        break;
+                    case (int)DisCountResultType.AlreadyUse:
+                        await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권을 모두 소진했습니다.", null);
+                        break;
+
+                    case (int)DisCountResultType.NotFound:
+                    default:
+                        break; 
                 }
-                else
-                {
-                    await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}", null);
-                }
+              
 
             });
         }
@@ -439,7 +451,7 @@ namespace ParkingHelp.ParkingDiscountBot
             {
                 await discountButton.ClickAsync();
 
-                // 3. 실제 Dialog가 나타날 때까지 기다림 (최대 3초)
+                // 3. 실제 Dialog가 나타날 때까지 기다림 (최대 5초)
                 var dialogTask = dialogTcs.Task;
                 if (await Task.WhenAny(dialogTask, Task.Delay(5000)) == dialogTask)
                 {
@@ -487,6 +499,27 @@ namespace ParkingHelp.ParkingDiscountBot
                         if (await Task.WhenAny(dialogTask, Task.Delay(5000)) == dialogTask)
                         {
                             var dialog = await dialogTask;
+                            await page.WaitForFunctionAsync(
+                            "(prev) => document.querySelector('#realFee')?.value !== prev",
+                              feeValueAfter, // 최대 5초 기다림
+                              new() { Timeout = 5000 }
+                             );
+                            feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
+                            feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
+                            Console.WriteLine($"할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+
+                            jobReturn["Result"] = "OK";
+                            jobReturn["ReturnMessage"] = $"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다. 할인권 적용 후 주차금액: {feeValue}원 => {feeValueAfter}원";
+                            if(feeValueAfter > 0)
+                            {
+                                jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.SuccessButFee);
+                            }
+                            else
+                            {
+                                jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
+                            }
+                                
+
                         }
                         if (alertMessage.Contains("불가능"))
                         {
@@ -506,6 +539,25 @@ namespace ParkingHelp.ParkingDiscountBot
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Error);
 
             }
+            return jobReturn;
+        }
+
+        private static async Task<JObject> GetParkingFee(IPage page,int feeValue,JObject jobReturn ,string carNum)
+        {
+         
+            await page.WaitForFunctionAsync(
+               "(prev) => document.querySelector('#realFee')?.value !== prev",
+                 feeValue, // 최대 5초 기다림
+                 new() { Timeout = 5000 }
+             );
+
+            // 금액 다시 확인
+            string feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
+            int feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
+            Console.WriteLine($"할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+
+            jobReturn["Result"] = "OK";
+            jobReturn["ReturnMessage"] = $"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다. 할인권 적용 후 주차금액: {feeValue}원 => {feeValueAfter}원";
             return jobReturn;
         }
 
