@@ -46,7 +46,8 @@ namespace ParkingHelp.ParkingDiscountBot
         private static AppDbContext _DbContext = null; // DB Context
                                                        //슬랙 채널에 결과 알림
         private static SlackOptions slackOptions = null;
-        private static SlackNotifier slackNotifier = new SlackNotifier(slackOptions);
+        private static SlackNotifier slackNotifier = null;
+
 
         public static event EventHandler<ParkingDiscountResultEventArgs>? OnParkingDiscountEvent; //주차 결과 이벤트
 
@@ -140,7 +141,6 @@ namespace ParkingHelp.ParkingDiscountBot
            Console.WriteLine($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} {e.MemberEmail}");
            _ =Task.Run(async () =>
            {
-               
                await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}", e.MemberEmail);
            });
         }
