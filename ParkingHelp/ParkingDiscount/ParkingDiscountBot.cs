@@ -21,28 +21,30 @@ namespace ParkingHelp.ParkingDiscountBot
         public string CarNumber { get; set; }
         public JObject Result { get; set; }
         public string MemberEmail { get; set; } = string.Empty;
-        public ParkingDiscountResultEventArgs(string carNumber, string memberEmail, JObject result)
+        public bool IsNotifySlack { get; set; } = false; //슬랙에 알림 여부
+        public ParkingDiscountResultEventArgs(string carNumber, string memberEmail, JObject result, bool isNotifySlack = false)
         {
             CarNumber = carNumber;
             Result = result;
             MemberEmail = memberEmail;
+            IsNotifySlack = isNotifySlack;
         }
     }
     public static class PlaywrightManager
     {
         //주차할인권 적용 페이지에 접근할 수 있는 Playwright 객체
-        private static IPlaywright _playwright;
-        private static IBrowser _browser;
-        private static IBrowserContext _context;  // 전역 context 추가
+        private static IPlaywright? _playwright;
+        private static IBrowser? _browser;
+        private static IBrowserContext? _context;  // 전역 context 추가
         //작업큐 관련
-        private static PriorityQueue<(string carNumber, string memberEmail, DiscountJobType jobType, TaskCompletionSource<JObject> tcs), int> _ParkingDiscountPriorityQueue = new();
+        private static PriorityQueue<(ParkingDiscountModel, DiscountJobType jobType, TaskCompletionSource<JObject> tcs), int> _ParkingDiscountPriorityQueue = new();
         private static SemaphoreSlim _semaphore = new(0);
         private static object _lock = new();
 
         private static TimeOnly _AutoDisCountApplyTime = new TimeOnly(17, 0, 0); // 자동 할인권 적용 시간 (17시 기준)
         //설정 및 의존성 주입 객체
-        private static IConfiguration _config;
-        private static IServiceProvider _services;
+        private static IConfiguration? _config;
+        private static IServiceProvider? _services;
 
         private static AppDbContext _DbContext = null; // DB Context
                                                        //슬랙 채널에 결과 알림
@@ -82,6 +84,8 @@ namespace ParkingHelp.ParkingDiscountBot
                     TimeOnly currentTime = TimeOnly.FromDateTime(DateTime.Now);
                     if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) && _AutoDisCountApplyTime.Hour == currentTime.Hour && _AutoDisCountApplyTime.Minute == currentTime.Minute)
                     {
+                        Console.WriteLine("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
+                        Logs.Info("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
                         List<MemberDto> members = GetMemberList();
                         foreach (MemberDto meber in members)
                         {
@@ -89,12 +93,16 @@ namespace ParkingHelp.ParkingDiscountBot
                             {
                                 //자동 할인권 적용 작업큐에 추가
                                 string memberEmail = meber.Email ?? string.Empty;
-                                _ = EnqueueAsync(car.CarNumber, DiscountJobType.ApplyDiscount, 100, memberEmail);
+                                int priority = 100; //기본 우선순위는 100, 필요시 조정 가능
+                                ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, true);
+                                _ = EnqueueAsync(discountModel, DiscountJobType.ApplyDiscount, priority);
                             }
                         }
                     }
                     else if (_config["AutoDiscountTime"] != null && _config["AutoDiscountTime"].ToUpper() == "NOW" && isOnlyFirstRun)
                     {
+                        Console.WriteLine("할인권 즉시 적용 상태입니다. 할인권 등록을위해 사용자 조회 시작합니다. 이작업은 작업은 한번만 실행됩니다.");
+                        Logs.Info("할인권 즉시 적용 상태입니다. 할인권 등록을위해 사용자 조회 시작합니다..");
                         List<MemberDto> members = GetMemberList();
                         foreach (MemberDto meber in members)
                         {
@@ -102,7 +110,9 @@ namespace ParkingHelp.ParkingDiscountBot
                             {
                                 //자동 할인권 적용 작업큐에 추가
                                 string memberEmail = meber.Email ?? string.Empty;
-                                _ = EnqueueAsync(car.CarNumber, DiscountJobType.ApplyDiscount, 100, memberEmail);
+                                int priority = 100;
+                                ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, true);
+                                _ = EnqueueAsync(discountModel, DiscountJobType.ApplyDiscount, priority);
                             }
                         }
                         isOnlyFirstRun = false; //즉시 실행은 한번만 실행
@@ -116,7 +126,7 @@ namespace ParkingHelp.ParkingDiscountBot
                     }
 
                     await _semaphore.WaitAsync();
-                    (string carNumber, string memberEmail, DiscountJobType jobType, TaskCompletionSource<JObject> tcs) item;
+                    (ParkingDiscountModel ParkingDisCountModel, DiscountJobType jobType, TaskCompletionSource<JObject> tcs) item;
 
                     lock (_lock)
                     {
@@ -130,14 +140,15 @@ namespace ParkingHelp.ParkingDiscountBot
 
                     try
                     {
+                        ParkingDiscountModel parkingDiscountModel = item.ParkingDisCountModel;
                         var result = item.jobType switch
                         {
-                            DiscountJobType.ApplyDiscount => await RunDiscountAsync(item.carNumber),
-                            DiscountJobType.CheckFeeOnly => await RunCheckFeeAsync(item.carNumber),
+                            DiscountJobType.ApplyDiscount => await RunDiscountAsync(parkingDiscountModel.CarNumber),
+                            DiscountJobType.CheckFeeOnly => await RunCheckFeeAsync(parkingDiscountModel.CarNumber),
                             _ => new JObject { ["Result"] = "Fail", ["ReturnMessage"] = "Unknown Job Type" }
                         };
                         item.tcs.SetResult(result);
-                        OnParkingDiscountEvent?.Invoke(null, new ParkingDiscountResultEventArgs(item.carNumber, item.memberEmail, result)); //슬랙채널에 결과를 알리기 위해 이벤트 호출
+                        OnParkingDiscountEvent?.Invoke(null, new ParkingDiscountResultEventArgs(parkingDiscountModel.CarNumber, parkingDiscountModel.MemberEmail, result, parkingDiscountModel.IsNotifySlack)); //슬랙채널에 결과를 알리기 위해 이벤트 호출
                     }
                     catch (Exception ex)
                     {
@@ -155,56 +166,75 @@ namespace ParkingHelp.ParkingDiscountBot
 
         private static void PlaywrightManager_OnParkingDiscountEvent(object? sender, ParkingDiscountResultEventArgs e)
         {
+            Console.WriteLine($"차량번호: {e.CarNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} ");
+            _ = SendParkingDiscountResult(e); //비동기로 슬랙에 결과 알림
+        }
+
+        /// <summary>
+        /// 할인권 적용 결과 이벤트
+        /// </summary>
+        /// <param name="e"></param>
+        /// <returns></returns>
+        private static async Task SendParkingDiscountResult(ParkingDiscountResultEventArgs e)
+        {
             string carNumber = e.CarNumber;
-            Console.WriteLine($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} {e.MemberEmail}");
-            _ = Task.Run(async () =>
+            Logs.Info($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} ");
+
+            if (e.IsNotifySlack)
             {
-                Logs.Info($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} ");
                 SlackUserByEmail? userInfo = await slackNotifier.FindUserByEmailAsync(e.MemberEmail);
+                string userId = userInfo?.Id ?? "";
+                userId = !string.IsNullOrEmpty(userId) ? $"<@{userId}>" : string.Empty;
                 switch (Convert.ToInt32(e.Result["ResultType"]))
                 {
                     case (int)DisCountResultType.Success:
-                        Logs.Info($"차량번호: {carNumber} 할인권 적용 성공");
+                        Logs.Info($"차량번호: {carNumber} 할인권 적용 완료");
                         break;
                     case (int)DisCountResultType.SuccessButFee:
-                        await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]}", null);
+                        await slackNotifier.SendMessageAsync($"{userId} {e.Result["ReturnMessage"]}", null);
                         break;
                     case (int)DisCountResultType.MoreThanTwoCar:
-                        await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권 적용 결과: 차량정보가 2대 이상입니다.", null);
+                        await slackNotifier.SendMessageAsync($"{userId} 차량번호: {carNumber} 할인권 적용 결과: 차량정보가 2대 이상입니다.", null);
                         break;
                     case (int)DisCountResultType.AlreadyUse:
-                        await slackNotifier.SendMessageAsync($"차량번호: {carNumber} 할인권을 모두 소진했습니다.", null);
+                        await slackNotifier.SendMessageAsync($"{userId} 차량번호: {carNumber} 이미 방문자 할인권을 사용했습니다.", null);
                         break;
-
+                    case (int)DisCountResultType.NoFee:
                     case (int)DisCountResultType.NotFound:
-                    default:
-                        break; 
-                }
-              
 
-            });
+                    default:
+                        break;
+                }
+            }
         }
 
         public static List<MemberDto> GetMemberList()
         {
             //db객체 가져옴
-            using var scope = _services.CreateScope();
-            _DbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            List<MemberDto> members = _DbContext.Members
-            .Include(m => m.Cars).Where(m => m.Cars != null && m.Cars.Count > 0)
-            .Select(m => new MemberDto
+            List<MemberDto> members = new List<MemberDto>();
+            if (_services != null)
             {
-                Id = m.Id,
-                MemberLoginId = m.MemberLoginId,
-                Name = m.MemberName,
-                Email = m.Email,
-                Cars = m.Cars.Select(c => new MemberCarDTO
+                using var scope = _services.CreateScope();
+                _DbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                members = _DbContext.Members
+                .Include(m => m.Cars).Where(m => m.Cars != null && m.Cars.Count > 0)
+                .Select(m => new MemberDto
                 {
-                    Id = c.Id,
-                    CarNumber = c.CarNumber
-                }).ToList()
-            }).ToList();
-
+                    Id = m.Id,
+                    MemberLoginId = m.MemberLoginId,
+                    Name = m.MemberName,
+                    Email = m.Email,
+                    Cars = m.Cars.Select(c => new MemberCarDTO
+                    {
+                        Id = c.Id,
+                        CarNumber = c.CarNumber
+                    }).ToList()
+                }).ToList();
+            }
+            else
+            {
+                Logs.Error("_services Is Null...");
+            }
             return members;
         }
 
@@ -215,14 +245,14 @@ namespace ParkingHelp.ParkingDiscountBot
         /// <param name="jobType">주차요금 조회 or 할인권 조회</param>
         /// <param name="priority">실행 우선순위 (0이 될수록 우선순위 증가 즉시 할인권 적용하려면 낮게 설정)</param>
         /// <returns></returns>
-        public static Task<JObject> EnqueueAsync(string carNumber, DiscountJobType jobType, int priority = 100, string memberEmail = "")
+        public static Task<JObject> EnqueueAsync(ParkingDiscountModel discountModel, DiscountJobType jobType, int priority = 100)
         {
             var tcs = new TaskCompletionSource<JObject>(); // 작업 완료를 기다리는 Task 생성
 
             lock (_lock)
             {
                 Console.WriteLine($"할인권 적용 요청을 받았습니다. 현재 할인권을 적용해야할 List는 총 {_ParkingDiscountPriorityQueue.Count}개 입니다");
-                _ParkingDiscountPriorityQueue.Enqueue((carNumber, memberEmail, jobType, tcs), priority);
+                _ParkingDiscountPriorityQueue.Enqueue((discountModel, jobType, tcs), priority);
             }
             _semaphore.Release();
 
@@ -362,7 +392,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         {
                             jobReturn["Result"] = "OK";
                             jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
-                            jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.NotFee);
+                            jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.NoFee);
                             Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
                         }
                     }
@@ -474,16 +504,17 @@ namespace ParkingHelp.ParkingDiscountBot
                 // 금액 다시 확인
                 string feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
                 int feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
-                Console.WriteLine($"할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                Console.WriteLine($"첫번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
 
                 jobReturn["Result"] = "OK";
                 jobReturn["ReturnMessage"] = $"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다. 할인권 적용 후 주차금액: {feeValue}원 => {feeValueAfter}원";
+
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
                 //할인권 더 적용
                 if (feeValueAfter > 0)
                 {
                     cancelButtons = await page.QuerySelectorAllAsync("button[id^='delete']");
-                    if (cancelButtons.Count == 2)
+                    if (cancelButtons.Count == 2) //더이상 할인권 사용 X
                     {
                         jobReturn["Result"] = "Fail";
                         jobReturn["ReturnMessage"] = $"차량번호:{carNum} 할인권이 이미 적용";
@@ -494,10 +525,13 @@ namespace ParkingHelp.ParkingDiscountBot
                     {
                         //잔액이 남았으므로 추가 할인권 적용
                         await discountButton.ClickAsync();
+
+                        dialogTcs = new TaskCompletionSource<IDialog>(); //다시 이벤트를 받기위해 새로운 TaskCompletionSource 생성
                         dialogTask = dialogTcs.Task;
 
                         if (await Task.WhenAny(dialogTask, Task.Delay(5000)) == dialogTask)
                         {
+                            Console.WriteLine($"feeValueAfter : {feeValueAfter}");
                             var dialog = await dialogTask;
                             await page.WaitForFunctionAsync(
                             "(prev) => document.querySelector('#realFee')?.value !== prev",
@@ -506,11 +540,11 @@ namespace ParkingHelp.ParkingDiscountBot
                              );
                             feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
                             feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
-                            Console.WriteLine($"할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                            Console.WriteLine($"두번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
 
                             jobReturn["Result"] = "OK";
                             jobReturn["ReturnMessage"] = $"차량번호:[{carNum}] 방문자 주차권이 적용되었습니다. 할인권 적용 후 주차금액: {feeValue}원 => {feeValueAfter}원";
-                            if(feeValueAfter > 0)
+                            if (feeValueAfter > 0)
                             {
                                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.SuccessButFee);
                             }
@@ -518,7 +552,7 @@ namespace ParkingHelp.ParkingDiscountBot
                             {
                                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
                             }
-                                
+
 
                         }
                         if (alertMessage.Contains("불가능"))
@@ -542,9 +576,9 @@ namespace ParkingHelp.ParkingDiscountBot
             return jobReturn;
         }
 
-        private static async Task<JObject> GetParkingFee(IPage page,int feeValue,JObject jobReturn ,string carNum)
+        private static async Task<JObject> GetParkingFee(IPage page, int feeValue, JObject jobReturn, string carNum)
         {
-         
+
             await page.WaitForFunctionAsync(
                "(prev) => document.querySelector('#realFee')?.value !== prev",
                  feeValue, // 최대 5초 기다림

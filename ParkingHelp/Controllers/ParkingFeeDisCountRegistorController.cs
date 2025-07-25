@@ -10,6 +10,7 @@ using ParkingHelp.DTO;
 using ParkingHelp.Models;
 using ParkingHelp.ParkingDiscountBot;
 using ParkingHelp.SlackBot;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace ParkingHelp.Controllers
 {
@@ -31,7 +32,8 @@ namespace ParkingHelp.Controllers
         public async Task<IActionResult> PostDiscountParkingFee([FromBody] ParkingDiscountFeePostParam query)
         {
 
-            JObject result = await PlaywrightManager.EnqueueAsync(query.CarNumber, DiscountJobType.ApplyDiscount, (int)DiscountJobPriority.High);
+            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(query.CarNumber, string.Empty,query.NotifySlackAlarm ?? false);
+            JObject result = await PlaywrightManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.ApplyDiscount, (int)DiscountJobPriority.High);
 
             if (result != null)
             {
@@ -80,8 +82,9 @@ namespace ParkingHelp.Controllers
                     CarNumber = c.CarNumber,
                 }).ToList()
             };
+            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(memberDto.Cars.First().CarNumber, string.Empty);
 
-            JObject result = await PlaywrightManager.EnqueueAsync(memberDto.Cars.First().CarNumber, DiscountJobType.CheckFeeOnly);
+            JObject result = await PlaywrightManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.CheckFeeOnly);
 
             if (result != null)
             {

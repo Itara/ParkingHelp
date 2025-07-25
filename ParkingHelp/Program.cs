@@ -17,12 +17,12 @@ var builder = WebApplication.CreateBuilder(args);
 //var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
-var filePath = Path.Combine(Directory.GetCurrentDirectory(), "DB.json");
+var filePath = Path.Combine(Directory.GetCurrentDirectory(), "Setting.json");
 var config = builder.Configuration;
 
 if (!File.Exists(filePath))
 {
-    Console.WriteLine("⚠️ DB.json 파일을 찾을 수 없습니다. 기본 설정 또는 환경변수를 사용합니다.");
+    Console.WriteLine("Setting.json 파일을 찾을 수 없습니다. 기본 설정 또는 환경변수를 사용합니다.");
     builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -38,7 +38,7 @@ if (!File.Exists(filePath))
 }
 else
 {
-    builder.Configuration.AddJsonFile("DB.json", optional: true, reloadOnChange: true);
+    builder.Configuration.AddJsonFile("Setting.json", optional: true, reloadOnChange: true);
     builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
