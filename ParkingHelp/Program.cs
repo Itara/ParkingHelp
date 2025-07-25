@@ -97,9 +97,6 @@ if (!Directory.Exists(logDirectory))
     Directory.CreateDirectory(logDirectory);
 }
 
-var slackOptions = app.Services.GetRequiredService<SlackOptions>();
-var slackNotifier = new SlackNotifier(slackOptions);
-
 PlaywrightManager.Initialize(app.Services,builder.Configuration);
 
 Logs.Init();

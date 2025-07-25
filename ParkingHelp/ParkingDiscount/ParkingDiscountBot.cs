@@ -48,7 +48,7 @@ namespace ParkingHelp.ParkingDiscountBot
         private static SlackOptions slackOptions = null;
         private static SlackNotifier slackNotifier = new SlackNotifier(slackOptions);
 
-        public static event EventHandler<ParkingDiscountResultEventArgs>? OnParkingDiscountEvent; // 에러 발생시 이벤트
+        public static event EventHandler<ParkingDiscountResultEventArgs>? OnParkingDiscountEvent; //주차 결과 이벤트
 
         public static void Initialize(IServiceProvider services, IConfiguration config)
         {
