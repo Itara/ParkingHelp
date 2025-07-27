@@ -96,10 +96,8 @@ if (!Directory.Exists(logDirectory))
 {
     Directory.CreateDirectory(logDirectory);
 }
-
+Logs.Info($"Log Directory: {logDirectory}");
 PlaywrightManager.Initialize(app.Services,builder.Configuration);
-
-Logs.Init();
 Logs.Info("Parking Helper Start...");
 
 app.Run();

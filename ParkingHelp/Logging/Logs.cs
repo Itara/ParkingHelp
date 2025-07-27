@@ -49,8 +49,6 @@ namespace ParkingHelp.Logging
                         _loggingEnabled = result;
                     }
                 }
-
-
             }
             catch (Exception ex)
             {
