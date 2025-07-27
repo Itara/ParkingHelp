@@ -90,7 +90,7 @@ app.MapControllers();
 
 // log4net 설정
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
-log4net.Config.XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
+Logs.Init(builder.Configuration);
 string logDirectory = "Logs";
 if (!Directory.Exists(logDirectory))
 {
