@@ -17,8 +17,8 @@ namespace ParkingHelp.Logging
         {
             try
             {
-                string logDirectory = Environment.CurrentDirectory + "\\Logs";
-                string configFile = Environment.CurrentDirectory + "\\log4net.config";
+                string logDirectory = Path.Combine(Environment.CurrentDirectory, "Logs");
+                string configFile = Path.Combine(Environment.CurrentDirectory, "log4net.config");
                 // 1. 로그 폴더 생성
                 if (!Directory.Exists(logDirectory))
                     Directory.CreateDirectory(logDirectory);
