@@ -33,7 +33,7 @@ namespace ParkingHelp.Controllers
         {
 
             ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(query.CarNumber, string.Empty,query.NotifySlackAlarm ?? false);
-            JObject result = await PlaywrightManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.ApplyDiscount, (int)DiscountJobPriority.High);
+            JObject result = await ParkingDiscountManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.ApplyDiscount, (int)DiscountJobPriority.High);
 
             if (result != null)
             {
@@ -84,7 +84,7 @@ namespace ParkingHelp.Controllers
             };
             ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(memberDto.Cars.First().CarNumber, string.Empty);
 
-            JObject result = await PlaywrightManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.CheckFeeOnly);
+            JObject result = await ParkingDiscountManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.CheckFeeOnly);
 
             if (result != null)
             {

@@ -56,7 +56,7 @@ namespace ParkingHelp.Models
         SuccessButFee , // 성공했지만 요금 남아있음
         NotFound , // 입차기록이없음
         AlreadyUse ,  // 이미 할인권 사용
-        MoreThanTwoCar, //차량정보가 2대 이상
+        CarMoreThanTwo, //차량정보가 2대 이상
         NoFee, // 결제할 금액없음
         NoUseTicket, // 할인권 없음
         Error = 99// 오류 발생
