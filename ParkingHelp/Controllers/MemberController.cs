@@ -9,6 +9,7 @@ using ParkingHelp.DTO;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace ParkingHelp.Controllers
 {
@@ -33,6 +34,90 @@ namespace ParkingHelp.Controllers
 
             try
             {
+
+                var helpOffers = await _context.HelpOffers
+                .Where(o => o.HelpDetails.Any(d => d.RequestMemberId != null))
+                .Include(o => o.HelperMember)
+                .Include(o => o.HelpDetails)
+                    .ThenInclude(d => d.RequestMember)
+                        .ThenInclude(m => m.Cars)
+                .OrderBy(o => o.Id).ToListAsync();
+
+                // 이후 메모리에서 DTO 조립
+                var result = helpOffers
+                    .SelectMany(offer =>
+                        offer.HelpDetails
+                            .Where(d => d.RequestMemberId != null)
+                            .Select(d => new
+                            {
+                                RequestMemberId = d.RequestMemberId!.Value, //위에서 null이 아닌 것만 필터링했으므로 안전하게 사용 가능
+                                Offer = new MyHelpOfferDTO
+                                {
+                                    Id = offer.Id,
+                                    Status = offer.Status,
+                                    DiscountTotalCount = offer.DiscountTotalCount,
+                                    DiscountApplyCount = offer.DiscountApplyCount,
+                                    HelperServiceDate = offer.HelerServiceDate,
+                                    SlackThreadTs = offer.SlackThreadTs,
+                                    Helper = new HelpMemberDto
+                                    {
+                                        Id = offer.HelperMember.Id,
+                                        Name = offer.HelperMember.MemberName,
+                                        Email = offer.HelperMember.Email,
+                                        SlackId = offer.HelperMember.SlackId
+                                    },
+                                    HelpOfferDetail = new List<HelpOfferDetailDTO>
+                                    {
+                            new HelpOfferDetailDTO
+                            {
+                                Id = d.Id,
+                                RequestDate = d.RequestDate,
+                                DiscountApplyDate = d.DiscountApplyDate,
+                                DiscountApplyType = d.DiscountApplyType,
+                                ReqDetailStatus = d.ReqDetailStatus,
+                                HelpRequester = new HelpRequesterDto
+                                {
+                                    Id = d.RequestMember.Id,
+                                    HelpRequesterName = d.RequestMember.MemberName,
+                                    RequesterEmail = d.RequestMember.Email,
+                                    SlackId = d.RequestMember.SlackId,
+                                    ReqHelpCar = d?.RequestMember?.Cars?
+                                    .Select(c => new ReqHelpCarDto
+                                    {
+                                        Id = c.Id,
+                                        CarNumber = c.CarNumber
+                                    })
+                                    .FirstOrDefault()
+                                }
+                            }
+                                    }
+                                }
+                            }))
+                    .ToList();
+
+                var groupedByMember = result
+                .GroupBy(x => x.RequestMemberId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g
+                        .GroupBy(x => x.Offer)
+                        .Select(og =>
+                        {
+                            var baseInfo = og.First();
+                            return new MyHelpOfferDTO
+                            {
+                                Id = baseInfo.Offer.Id,
+                                DiscountTotalCount = baseInfo.Offer.DiscountTotalCount,
+                                DiscountApplyCount = baseInfo.Offer.DiscountApplyCount,
+                                HelperServiceDate = baseInfo.Offer.HelperServiceDate,
+                                Helper = baseInfo.Offer.Helper,
+                                HelpOfferDetail = baseInfo.Offer.HelpOfferDetail
+                            };
+                        })
+                        .ToList()
+                );
+
+
                 var memberDtos = await _context.Members.Where(m =>
                     (string.IsNullOrWhiteSpace(param.memberLoginId) || m.MemberLoginId.Contains(param.memberLoginId)) &&
                     (string.IsNullOrWhiteSpace(param.memberName) || m.MemberName.Contains(param.memberName)) &&
@@ -76,6 +161,8 @@ namespace ParkingHelp.Controllers
                         {
                             Id = detail.Id,
                             ReqDetailStatus = detail.ReqDetailStatus,
+                            DiscountApplyDate = detail.DiscountApplyDate,
+                            DiscountApplyType = detail.DiscountApplyType,
                             InsertDate = detail.InsertDate,
                             Helper = detail.HelperMember == null ? null : new HelpMemberDto
                             {
@@ -121,9 +208,66 @@ namespace ParkingHelp.Controllers
                                 }).FirstOrDefault()
                             }
                         }).ToList()
-                    }).ToList()
-                })
-                .ToListAsync();
+                    }).ToList(),
+                    HelpOfferMyRequestHistory = groupedByMember.ContainsKey(m.Id) ? groupedByMember[m.Id] : new List<MyHelpOfferDTO>() 
+                }).OrderBy(o => o.Id).ToListAsync();
+
+                var kstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Seoul");
+                var nowKST = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, kstTimeZone);
+                var startOfTodayKST = new DateTimeOffset(nowKST.Date, kstTimeZone.GetUtcOffset(nowKST.Date));
+                var endOfTodayKST = startOfTodayKST.AddDays(1).AddSeconds(-1);
+
+                // UTC 변환
+                var startOfTodayUTC = startOfTodayKST.UtcDateTime;
+                var endOfTodayUTC = endOfTodayKST.UtcDateTime;
+
+
+                foreach (var memberDto in memberDtos)
+                {
+                    //myHelpRequest
+                    var myHelpRequests = await _context.ReqHelps
+                        .Include(r => r.HelpReqMember)
+                        .ThenInclude(m => m.Cars)
+                        .Include(r => r.HelpDetails)
+                        .Where(r => r.HelpDetails.Any(d => d.HelperMemberId == memberDto.Id && d.ReqDetailStatus == ReqDetailStatus.Completed && d.InsertDate >= startOfTodayUTC && d.InsertDate <= endOfTodayUTC)).ToListAsync();
+                    List<ReqHelpDto> tmpHistory = myHelpRequests.Select(req => new ReqHelpDto
+                    {
+                        Id = req.Id,
+                        ApplyDisCount = req.DiscountApplyCount,
+                        TotalDisCount = req.DiscountTotalCount,
+                        Status = req.Status,
+                        ReqDate = req.ReqDate,
+                        HelpRequester = new HelpRequesterDto
+                        {
+                            Id = req.HelpReqMember.Id,
+                            HelpRequesterName = req.HelpReqMember.MemberName,
+                            RequesterEmail = req.HelpReqMember.Email,
+                            SlackId = req.HelpReqMember.SlackId,
+                            ReqHelpCar = req.HelpReqMember.Cars.Select(c => new ReqHelpCarDto
+                            {
+                                Id = c.Id,
+                                CarNumber = c.CarNumber
+                            }).FirstOrDefault()
+                        },
+                        HelpDetails = req.HelpDetails.Where(x => x.ReqDetailStatus == ReqDetailStatus.Completed).Select(detail => new ReqHelpDetailDto
+                        {
+                            Id = detail.Id,
+                            ReqDetailStatus = detail.ReqDetailStatus,
+                            DiscountApplyDate = detail.DiscountApplyDate,
+                            DiscountApplyType = detail.DiscountApplyType,
+                            InsertDate = detail.InsertDate,
+                            Helper = detail.HelperMember == null ? null : new HelpMemberDto
+                            {
+                                Id = detail.HelperMemberId ?? 0,
+                                Name = detail.HelperMember.MemberName,
+                                Email = detail.HelperMember.Email,
+                                SlackId = detail.HelperMember.SlackId
+                            }
+                        }).ToList()
+                    }).ToList();
+
+                    memberDto.MyRequestHelpCompleteHistory = tmpHistory;
+                }
 
                 return Ok(memberDtos);
             }

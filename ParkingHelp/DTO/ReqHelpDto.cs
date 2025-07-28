@@ -33,7 +33,7 @@ namespace ParkingHelp.DTO
         public string? UpdateSlackThreadTs { get; set; } = null!;
         public int TotalDisCount { get; set; }
         public int? ApplyDisCount { get; set; }
-
+        public int? AccectCount { get;set; }
         public List<ReqHelpDetailDto> HelpDetails { get; set; } = new();
 
     }

@@ -45,7 +45,6 @@ namespace ParkingHelp.DB.QueryCondition
         public int? DiscountApplyCount { get; set; }
         public int? DisCountAcceptedCount { get; set; }
         public List<RequestHelpDatailPutParam>? RequestHelpDetail { get; set; }
-        
     }
 
     public class RequestHelpDetailParam
@@ -59,14 +58,30 @@ namespace ParkingHelp.DB.QueryCondition
 
     public class RequestHelpDatailPutParam
     {
+        [SwaggerSchema("", Format = "int")]
         public int Id { get; set; }
         [SwaggerSchema("도움요청자의 고유ID 0입력시 Null값입력", Format = "int")]
         public int? HelperMemId { get; set; }
-
         [SwaggerSchema("주차 등록상태", Format = "int")]
         public ReqDetailStatus? Status { get; set; }
         [SwaggerSchema("요청 수락 일자 UTC값 입력", Format = "date-time")]
         public DateTimeOffset? DiscountApplyDate { get; set; }
+        [SwaggerSchema("None = 0 , Cafe = 1, Restaurant = 2", Format = "int")]
         public DiscountApplyType? DiscountApplyType { get; set; }
     }
+
+
+    public class RequestHelpMultiPutParam
+    {
+        [SwaggerSchema("요청상태 0:대기 , 1:진행중 , 2 :주차등록 완료", Format = "int")]
+        public HelpStatus? Status { get; set; }
+        [SwaggerSchema("요청 할인권 갯수", Format = "int")]
+        public int? DiscountApplyCount { get; set; }
+        public int? DisCountAcceptedCount { get; set; }
+        public List<RequestHelpDatailMultiPutParam>? RequestHelpDetail { get; set; }
+    }
+
+ 
+
+   
 }

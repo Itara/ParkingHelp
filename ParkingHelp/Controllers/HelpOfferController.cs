@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.DTO;
+using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 
@@ -186,7 +187,7 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutHelpOffer(int id, [FromBody] HelpOfferPutParam query)
+        public async Task<IActionResult> PutHelpOffer(int id , [FromBody] HelpOfferPutParam query)
         {
             if (query == null)
                 return BadRequest("요청 데이터가 없습니다.");
@@ -195,7 +196,6 @@ namespace ParkingHelp.Controllers
             {
                 var helpOffer = await _context.HelpOffers
                     .Include(h => h.HelperMember)
-                    .ThenInclude(h => h.Cars)
                     .Include(h => h.HelpDetails)
                     .ThenInclude(d => d.RequestMember)
                     .ThenInclude(m => m.Cars)
@@ -211,6 +211,7 @@ namespace ParkingHelp.Controllers
                     helpOffer.HelerServiceDate = helpOffer.HelerServiceDate;
                     helpOffer.Status = query.Status ?? helpOffer.Status;
 
+                    int currentApplyCount = helpOffer.DiscountApplyCount ?? 0;
                     var detailIds = query.HelpOfferDetail?.Select(x => x.Id).ToHashSet() ?? new HashSet<int>();
                     var existingDetails = helpOffer.HelpDetails.Where(d => detailIds.Contains(d.Id)).ToDictionary(d => d.Id);
 
@@ -221,14 +222,26 @@ namespace ParkingHelp.Controllers
                             if (!existingDetails.TryGetValue(detail.Id, out var existing))
                                 continue;
 
-                            if (existing.RequestMemberId == null && query.HelpMemId.HasValue)
+                            if (detail.ReqMemberId.HasValue && detail.Status != ReqDetailStatus.Completed)
                             {
-                                existing.RequestMemberId = query.HelpMemId.Value;
+                                existing.RequestMemberId = detail.ReqMemberId == 0 ? null : detail.ReqMemberId;
                             }
-
                             var statusChanged = detail.Status.HasValue && existing.ReqDetailStatus != detail.Status.Value;
 
                             existing.ReqDetailStatus = detail.Status ?? existing.ReqDetailStatus;
+                            if (detail.Status.HasValue)
+                            {
+                                switch (detail.Status.Value)
+                                {
+                                    case ReqDetailStatus.Waiting:
+                                        currentApplyCount--;
+                                        break;
+
+                                    case ReqDetailStatus.Check:
+                                        currentApplyCount++;
+                                        break;
+                                }
+                            }
                             existing.DiscountApplyType = detail.DiscountApplyType ?? existing.DiscountApplyType;
 
                             if (statusChanged && existing.ReqDetailStatus == ReqDetailStatus.Completed)
@@ -243,30 +256,19 @@ namespace ParkingHelp.Controllers
                             {
                                 existing.RequestDate = detail.RequestDate.Value;
                             }
+
+                            await _context.Entry(existing)
+                             .Reference(e => e.RequestMember)
+                             .Query()
+                             .Include(m => m.Cars)
+                             .LoadAsync();
                         }
                     }
-
-                    var completedCount = helpOffer.HelpDetails.Count(d => d.ReqDetailStatus == ReqDetailStatus.Completed);
-                    helpOffer.DiscountApplyCount = completedCount;
-
-                    if (!query.Status.HasValue)
-                    {
-                        if (helpOffer.DiscountApplyCount == helpOffer.DiscountTotalCount)
-                        {
-                            helpOffer.Status = HelpStatus.Completed;
-                        }
-                        else if (helpOffer.DiscountApplyCount > 0)
-                        {
-                            helpOffer.Status = HelpStatus.Check;
-                        }
-                        else
-                        {
-                            helpOffer.Status = HelpStatus.Waiting;
-                        }
-                    }
+                    helpOffer.DiscountApplyCount = currentApplyCount;
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
+       
 
                     var updatedDto = new HelpOfferDTO
                     {
@@ -300,7 +302,7 @@ namespace ParkingHelp.Controllers
                                 {
                                     Id = c.Id,
                                     CarNumber = c.CarNumber
-                                }).FirstOrDefault()
+                                }).FirstOrDefault() 
                             }
                         }).ToList()
                     };
@@ -387,7 +389,92 @@ namespace ParkingHelp.Controllers
             }
         }
 
+        [HttpDelete("HelpOfferDetail/{HelpOfferDetailId}")]
+        public async Task<IActionResult> DelteRequestHelpDetail(int HelpOfferDetailId)
+        {
+            try
+            {
+                JObject returnJob = new JObject();
 
+                if (_context.HelpOffersDetail.Any(m => m.Id == HelpOfferDetailId))
+                {
+
+                    var deleteHelpOfferDetail = _context.HelpOffersDetail
+                        .Include(r => r.HelpOffer)
+                        .Include(r => r.RequestMember)
+                        .Where(x => x.Id == HelpOfferDetailId).First();
+
+                    int reqId = deleteHelpOfferDetail.HelpOfferId;
+                    var updateHelpOffer = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == reqId);
+
+                    _context.HelpOffersDetail.Remove(deleteHelpOfferDetail);
+                    if (updateHelpOffer != null)
+                    {
+                        if (updateHelpOffer.DiscountTotalCount == updateHelpOffer.DiscountApplyCount)
+                        {
+                            updateHelpOffer.DiscountApplyCount -= 1;
+                        }
+                        updateHelpOffer.DiscountTotalCount -= 1;
+
+                        if (updateHelpOffer.DiscountTotalCount < 1)
+                        {
+                            _context.HelpOffers.Remove(updateHelpOffer);
+                        }
+                        else
+                        {
+                            _context.HelpOffers.Update(updateHelpOffer);
+                        }
+                        await _context.SaveChangesAsync();
+                    }
+
+                    var returnHelpOffer = await _context.HelpOffers.Where(r => r.Id == reqId)
+                                      .Include(r => r.HelperMember)
+                                          .ThenInclude(m => m.Cars)
+                                      .Include(r => r.HelpDetails)
+                                      .Select(r => new HelpOfferDTO
+                                      {
+                                          Id = r.Id,
+                                          HelperServiceDate = r.HelerServiceDate,
+                                          Status = r.Status,
+                                          DiscountTotalCount = r.DiscountTotalCount,
+                                          DiscountApplyCount = r.DiscountApplyCount, // 적용 수량은 추후 계산 or 외부 값
+                                          Helper = new HelpMemberDto
+                                          {
+                                              Id = r.HelperMember.Id,
+                                              Name = r.HelperMember.MemberName,
+                                              Email = r.HelperMember.Email,
+                                              SlackId = r.HelperMember.SlackId
+                                          },
+                                          HelpOfferDetail = r.HelpDetails.Select(d => new HelpOfferDetailDTO
+                                          {
+                                              Id = d.Id,
+                                              ReqDetailStatus = d.ReqDetailStatus,
+                                              DiscountApplyDate = d.DiscountApplyDate,
+                                              DiscountApplyType = d.DiscountApplyType,
+                                              RequestDate = d.RequestDate,
+                                              HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                                              {
+                                                  Id = d.RequestMember.Id,
+                                                  HelpRequesterName = d.RequestMember.MemberName,
+                                                  RequesterEmail = d.RequestMember.Email,
+                                                  SlackId = d.RequestMember.SlackId
+                                              }
+                                          }).ToList()
+                                      }).ToListAsync();
+                    return Ok(returnHelpOffer);
+                }
+                else
+                {
+                    returnJob = GetErrorJobject("해당 ID값이 존재하지않습니다.", "");
+                    return NotFound(returnJob.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
+        }
 
 
         private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)

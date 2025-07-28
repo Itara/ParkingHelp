@@ -39,4 +39,27 @@ namespace ParkingHelp.Models
         [EnumMember(Value = "Descending (내림차순)")]
         Descending = 1, // 내림차순
     }
+    public enum DiscountJobType
+    {
+        ApplyDiscount,
+        CheckFeeOnly
+    }
+    public enum DiscountJobPriority
+    {
+        High = 0, // 즉시 할인권 적용
+        Medium = 50, // 퇴근 등록 차량
+        Low = 100 // 배치 시간에 맞춰서 할인권 적용
+    }
+    public enum DisCountResultType
+    {
+        Success = 0, // 성공
+        SuccessButFee , // 성공했지만 요금 남아있음
+        NotFound , // 입차기록이없음
+        AlreadyUse ,  // 이미 할인권 사용
+        CarMoreThanTwo, //차량정보가 2대 이상
+        NoFee, // 결제할 금액없음
+        NoUseTicket, // 할인권 없음
+        Error = 99// 오류 발생
+    }
+
 }

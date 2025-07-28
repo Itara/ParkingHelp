@@ -43,7 +43,7 @@ namespace ParkingHelp.DB.QueryCondition
     public class HelpOfferPutParam
     {
         /// <summary>도움을 요청한 사람</summary>
-        public int? HelpMemId { get; set; }
+        //public int? HelpMemId { get; set; }
         /// <summary>대기 누른 시간</summary>
         //public DateTime? HelpDate { get; set; }
 
@@ -72,14 +72,14 @@ namespace ParkingHelp.DB.QueryCondition
     public class HelpOfferDetailPutParam
     {
         public int Id { get; set; }
-        [SwaggerSchema("도움요청자의 고유ID", Format = "int")]
-        public int? HelperMemId { get; set; }
+        //[SwaggerSchema("도움요청자의 고유ID", Format = "int")]
+        //public int? HelperMemId { get; set; }
         public ReqDetailStatus? Status { get; set; }
         public DateTimeOffset? DiscountApplyDate { get; set; }
         public DiscountApplyType? DiscountApplyType { get; set; }
         //public List<HelpOfferDetailParam>? HelpOfferDetail { get; set; }
         public DateTimeOffset? RequestDate { get; set; }
-        public ReqHelpCarDto? ReqHelpCar { get; set; }
+        public int? ReqMemberId { get; set; }
 
 
     }

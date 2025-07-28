@@ -1,13 +1,16 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using log4net;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.CodeAnalysis.Elfie.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics.Internal;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.DTO;
+using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 using System.Linq;
@@ -20,12 +23,12 @@ namespace ParkingHelp.Controllers
     public class RequestHelpController : ControllerBase
     {
         private readonly AppDbContext _context;
-
         private readonly SlackNotifier _slackNotifier;
         public RequestHelpController(AppDbContext context, SlackOptions slackOptions)
         {
             _context = context;
             _slackNotifier = new SlackNotifier(slackOptions);
+          
         }
 
         /// <summary>
@@ -79,11 +82,12 @@ namespace ParkingHelp.Controllers
                         Id = r.HelpReqMember.Id,
                         HelpRequesterName = r.HelpReqMember.MemberName,
                         RequesterEmail = r.HelpReqMember.Email,
-                        ReqHelpCar = new ReqHelpCarDto
+                        ReqHelpCar = (r.HelpReqMember.Cars != null && r.HelpReqMember.Cars.Any())
+                        ? new ReqHelpCarDto
                         {
                             Id = r.HelpReqMember.Cars.First().Id,
                             CarNumber = r.HelpReqMember.Cars.First().CarNumber
-                        }
+                        } : null
                     },
                     HelpDetails = r.HelpDetails
                     .Select(d => new ReqHelpDetailDto
@@ -168,11 +172,11 @@ namespace ParkingHelp.Controllers
                            Id = r.HelpReqMember.Id,
                            HelpRequesterName = r.HelpReqMember.MemberName,
                            RequesterEmail = r.HelpReqMember.Email,
-                           ReqHelpCar = new ReqHelpCarDto
+                           ReqHelpCar = r.HelpReqMember.Cars.Select(c => new ReqHelpCarDto
                            {
-                               Id = r.HelpReqMember.Cars.First().Id,
-                               CarNumber = r.HelpReqMember.Cars.First().CarNumber
-                           }
+                               Id = c.Id,
+                               CarNumber = c.CarNumber
+                           }).FirstOrDefault()
                        },
                        HelpDetails = r.HelpDetails
                     .Select(d => new ReqHelpDetailDto
@@ -439,12 +443,11 @@ namespace ParkingHelp.Controllers
 
 
         [HttpPut("ReqHelpDetail")]
-        public async Task<IActionResult> PutRequestHelpDetailMultiUpdate([FromBody] PutRequestHelpDetailMultiUpdateParam param)
+        public async Task<IActionResult> PutRequestHelpDetailMultiUpdate([FromBody] RequestHelpDetailMultiUpdatePutParam param)
         {
             try
             {
                 int updateReqId = param.ReqId;
-
                 var reqHelp = await _context.ReqHelps
                 .Include(r => r.HelpReqMember)
                 .ThenInclude(m => m.Cars)
@@ -457,9 +460,15 @@ namespace ParkingHelp.Controllers
                 }
                 else
                 {
-                    List<ReqHelpDetailModel> helpDetailModels = helpDetailModels = reqHelp.HelpDetails.OrderBy(x => x.Id).Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue).ToList();
+                    reqHelp.DiscountApplyCount = param.DiscountApplyCount ?? reqHelp.DiscountApplyCount;
+                    var helpDetailModels = reqHelp.HelpDetails
+                      .Where(x => x.ReqDetailStatus == param.UpdateTargetReqDetailStatus &&
+                                  (param.UpdateTargetIdList == null || param.UpdateTargetIdList.Count == 0 || param.UpdateTargetIdList.Contains(x.Id)))
+                      .OrderBy(x => x.Id)
+                      .Take(param.UpdateTargetCount > 0 ? param.UpdateTargetCount.Value : int.MaxValue)
+                      .ToList();
 
-                    foreach (var ReqHelpDetailModel in helpDetailModels.Where(d => d.ReqDetailStatus == param.UpdateTargetReqDetailStatus))
+                    foreach (var ReqHelpDetailModel in helpDetailModels)
                     {
                         ReqHelpDetailModel.DiscountApplyDate = param.RequestHelpDatailPutParam.DiscountApplyDate ?? ReqHelpDetailModel.DiscountApplyDate;
                         ReqHelpDetailModel.DiscountApplyType = param.RequestHelpDatailPutParam.DiscountApplyType ?? ReqHelpDetailModel.DiscountApplyType;
@@ -529,6 +538,7 @@ namespace ParkingHelp.Controllers
         [HttpPut("ReqHelpDetail/{RequestDetailId}")]
         public async Task<IActionResult> PutRequestHelpDetail(int RequestDetailId, [FromQuery] RequestHelpDetailPutParam param)
         {
+            Logs.Info($"PutRequestHelpDetail Id {RequestDetailId} , param : {param.ToString()}");
             try
             {
                 var updateTarget = await _context.ReqHelpsDetail
@@ -543,44 +553,83 @@ namespace ParkingHelp.Controllers
                 }
                 else
                 {
-                    updateTarget.HelperMemberId = param.HelperMemId.HasValue ? (param.HelperMemId == 0 ? null : param.HelperMemId) : updateTarget.HelperMemberId;
+                    ReqHelpModel? rephelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).FirstOrDefault();
+                    if (rephelp == null)
+                    {
+                        JObject jResult = GetErrorJobject($"id : {updateTarget.Req_Id} 값에 해당되는 요청 값이 없습니다 ", "");
+                        return NotFound(jResult.ToString());
+                    }
 
+                    updateTarget.HelperMemberId = param.HelperMemId.HasValue ? (param.HelperMemId == 0 ? null : param.HelperMemId) : updateTarget.HelperMemberId;
                     updateTarget.DiscountApplyDate = param.DisCountApplyDate.HasValue ? param.DisCountApplyDate.Value.ToUniversalTime() : updateTarget.DiscountApplyDate;
                     updateTarget.DiscountApplyType = param.DisCountApplyType.HasValue ? param.DisCountApplyType.Value : updateTarget.DiscountApplyType;
-                    updateTarget.ReqDetailStatus = param.ReqDetailStatus.HasValue ? param.ReqDetailStatus.Value : updateTarget.ReqDetailStatus;
-                    _context.ReqHelpsDetail.Update(updateTarget);
-
-                    if (updateTarget.ReqDetailStatus == ReqDetailStatus.Completed)
+                    if (param.ReqDetailStatus.HasValue)
                     {
-                        var updateReqHelp = _context.ReqHelps.Where(x => x.Id == updateTarget.Req_Id).First();
-                        updateReqHelp.DiscountApplyCount = updateReqHelp.DiscountApplyCount == null ? 1 : updateReqHelp.DiscountApplyCount.Value + 1; //null이면 0과 동일하므로  
-                        _context.ReqHelps.Update(updateReqHelp);
+                        updateTarget.ReqDetailStatus = param.ReqDetailStatus.Value;
                     }
+
+                    _context.ReqHelpsDetail.Update(updateTarget);
+                    await _context.SaveChangesAsync(); //요청 세부사항 DB에 반영
+
+                    int applyCount = _context.ReqHelpsDetail.Where(x => x.Req_Id == updateTarget.Req_Id && x.ReqDetailStatus != ReqDetailStatus.Waiting).Count(); //현재 남아있는 ReqHelpDetail의 개수 중 적용된 개수를 가져옴
+                    rephelp.DiscountApplyCount = applyCount;
+                    if(rephelp.DiscountTotalCount == applyCount)
+                    {
+                        rephelp.Status = HelpStatus.Completed; //모든 요청이 완료되면 상태를 Completed로 변경
+                    }
+                    else if(applyCount != 0 && applyCount < rephelp.DiscountTotalCount)
+                    {
+                        rephelp.Status = HelpStatus.Check;
+                    }
+                    else
+                    {
+                        rephelp.Status = HelpStatus.Waiting; //1건도 적용되지 않은 상태
+                    }
+
                     await _context.SaveChangesAsync();
                 }
 
-                var reqHelpDetail = await _context.ReqHelpsDetail
-                .Include(r => r.ReqHelps)
-                .Include(r => r.HelperMember)
-                .Where(x => x.Id == RequestDetailId)
-                .Select(r => new ReqHelpDetailDto
-                {
-                    Id = r.Id,
-                    ReqDetailStatus = r.ReqDetailStatus,
-                    DiscountApplyDate = r.DiscountApplyDate,
-                    DiscountApplyType = r.DiscountApplyType,
-                    InsertDate = r.InsertDate,
-                    SlackThreadTs = r.SlackThreadTs,
-                    Helper = r.HelperMember == null ? null : new HelpMemberDto
-                    {
-                        Id = r.HelperMember.Id,
-                        Name = r.HelperMember.MemberName,
-                        Email = r.HelperMember.Email,
-                    },
-                })
-                .OrderBy(x => x.Id)
-                .ToListAsync();
-                return Ok(reqHelpDetail);
+                var returnReqHelp = await _context.ReqHelps.Where(r => r.Id == updateTarget.Req_Id)
+                                        .Include(r => r.HelpReqMember)
+                                            .ThenInclude(m => m.Cars)
+                                        .Include(r => r.HelpDetails)
+                                        .Select(r => new ReqHelpDto
+                                        {
+                                            Id = r.Id,
+                                            ReqDate = r.ReqDate,
+                                            Status = r.Status,
+                                            TotalDisCount = r.DiscountTotalCount,
+                                            ApplyDisCount = r.DiscountApplyCount, // 적용 수량은 추후 계산 or 외부 값
+                                            HelpRequester = new HelpRequesterDto
+                                            {
+                                                Id = r.HelpReqMember.Id,
+                                                HelpRequesterName = r.HelpReqMember.MemberName,
+                                                RequesterEmail = r.HelpReqMember.Email,
+                                                ReqHelpCar = r.HelpReqMember.Cars == null ? null : new ReqHelpCarDto
+                                                {
+                                                    Id = r.HelpReqMember.Cars.First().Id,
+                                                    CarNumber = r.HelpReqMember.Cars.First().CarNumber
+                                                }
+                                            },
+                                            HelpDetails = r.HelpDetails.Where(d => d.Id == RequestDetailId).Select(d => new ReqHelpDetailDto
+                                            {
+                                                Id = d.Id,
+                                                ReqDetailStatus = d.ReqDetailStatus,
+                                                DiscountApplyDate = d.DiscountApplyDate,
+                                                DiscountApplyType = d.DiscountApplyType,
+                                                InsertDate = d.InsertDate,
+                                                SlackThreadTs = d.SlackThreadTs,
+                                                Helper = d.HelperMember == null ? null : new HelpMemberDto
+                                                {
+                                                    Id = d.HelperMember.Id,
+                                                    Name = d.HelperMember.MemberName,
+                                                    Email = d.HelperMember.Email,
+                                                    SlackId = d.HelperMember.SlackId
+                                                }
+                                            }).ToList()
+                                        }).ToListAsync();
+
+                return Ok(returnReqHelp);
             }
             catch (Exception ex)
             {
@@ -592,58 +641,98 @@ namespace ParkingHelp.Controllers
         [HttpDelete("ReqHelpDetail/{RequestDetailId}")]
         public async Task<IActionResult> DelteRequestHelpDetail(int RequestDetailId)
         {
+            //_Logger.Info($"DelteRequestHelpDetail Id {RequestDetailId}");
             try
             {
                 JObject returnJob = new JObject();
-
-                if (_context.ReqHelpsDetail.Any(m => m.Id == RequestDetailId))
+                var deleteReqHelpDetail = _context.ReqHelpsDetail.Where(x => x.Id == RequestDetailId).FirstOrDefault();
+                if (deleteReqHelpDetail == null)
                 {
+                    return NotFound(GetErrorJobject($"해당 요청세부 내역(ID: {RequestDetailId})이 존재하지 않습니다.", "").ToString());
+                }
 
-                    var deleteReqHelpDetail = _context.ReqHelpsDetail
-                        .Include(r => r.ReqHelps)
-                        .Include(r => r.HelperMember)
-                        .Where(x => x.Id == RequestDetailId).First();
-                    int reqId = deleteReqHelpDetail.Req_Id;
-                    _context.ReqHelpsDetail.Remove(deleteReqHelpDetail);
+                int reqId = deleteReqHelpDetail.Req_Id;
 
-                    var updateReqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == reqId);
+                _context.ReqHelpsDetail.Remove(deleteReqHelpDetail);
 
-                    if (updateReqHelp != null)
-                    {
-                        updateReqHelp.DiscountTotalCount -= 1;
+                //DB반영
+                await _context.SaveChangesAsync();
 
-                        if (updateReqHelp.DiscountTotalCount < 1)
-                        {
-                            _context.ReqHelps.Remove(updateReqHelp);
-                            returnJob = new JObject
-                            {
-                                { "Result", "Success" },
-                                { "RequestDetail", "할인권 적용 요청이 0개이므로 해당 할인권적용 요청건은 삭제했습니다" },
-                                { "RemoveReqHelp", true }
-                            };
-                        }
-                        else
-                        {
-                            _context.ReqHelps.Update(updateReqHelp);
-                            returnJob = new JObject
-                            {
-                                { "Result", "Success" },
-                                { "RequestDetail", $"할인권 요청이 {updateReqHelp.DiscountTotalCount}개 남았습니다" },
-                                { "RemoveReqHelp", false }
-                            };
-                        }
+                int totalCount = _context.ReqHelpsDetail.Where(x => x.Req_Id == reqId).Count(); //현재 남아있는 ReqHelpDetail의 개수를 가져옴
+                int applyCount = _context.ReqHelpsDetail.Where(x => x.Req_Id == reqId && x.ReqDetailStatus != ReqDetailStatus.Waiting).Count(); //현재 남아있는 ReqHelpDetail의 개수 중 적용된 개수를 가져옴
 
-                        await _context.SaveChangesAsync();
-                    }
-
-
-                    return Ok(returnJob.ToString());
+                ReqHelpModel? updateReqHelp = await _context.ReqHelps.FirstOrDefaultAsync(x => x.Id == reqId);
+                if (totalCount > 0 && updateReqHelp != null)
+                {
+                    //삭제이후 요청의 총갯수를 다시 적용한다.
+                    updateReqHelp.DiscountTotalCount = totalCount;
+                    updateReqHelp.DiscountApplyCount = applyCount;
+                    _context.ReqHelps.Update(updateReqHelp);
+                }
+                else if (totalCount == 0 && updateReqHelp != null)//ReqHelpDetail이 하나도 남아있지 않으면 ReqHelp를 삭제
+                {
+                    _context.ReqHelps.Remove(updateReqHelp);
+                    await _context.SaveChangesAsync();
+                    return Ok(new List<ReqHelpDto>());
                 }
                 else
                 {
-                    returnJob = GetErrorJobject("해당 ID값이 존재하지않습니다.", "");
-                    return NotFound(returnJob.ToString());
+                    JObject jResult = GetErrorJobject("updateReqHelp Is Null", "InnerException is Null");
+                    return BadRequest(jResult.ToString());
                 }
+
+                //DB반영
+                await _context.SaveChangesAsync();
+
+                var latestReqHelp = _context.ReqHelps.Where(x => x.Id == reqId)
+                 .Include(r => r.HelpReqMember).ThenInclude(m => m.Cars)
+                 .Include(r => r.HelpDetails).ThenInclude(r => r.HelperMember)
+                 .FirstOrDefault();
+             
+                if(latestReqHelp == null)
+                {
+                    return Ok();
+                }
+
+                var returnReqHelp = new ReqHelpDto
+                {
+                    Id = latestReqHelp.Id,
+                    ReqDate = latestReqHelp.ReqDate,
+                    Status = latestReqHelp.Status,
+                    TotalDisCount = totalCount,
+                    ApplyDisCount = latestReqHelp.DiscountApplyCount,
+                    HelpRequester = new HelpRequesterDto
+                    {
+                        Id = latestReqHelp.HelpReqMember.Id,
+                        HelpRequesterName = latestReqHelp.HelpReqMember.MemberName,
+                        RequesterEmail = latestReqHelp.HelpReqMember.Email,
+                        ReqHelpCar = latestReqHelp.ReqCar != null && latestReqHelp.HelpReqMember.Cars?.Any() == true
+                        ? new ReqHelpCarDto
+                        {
+                            Id = latestReqHelp.HelpReqMember.Cars.First().Id,
+                            CarNumber = latestReqHelp.HelpReqMember.Cars.First().CarNumber
+                        }
+                        : null
+                    },
+                    HelpDetails = latestReqHelp.HelpDetails.Select(d => new ReqHelpDetailDto
+                    {
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        DiscountApplyType = d.DiscountApplyType,
+                        InsertDate = d.InsertDate,
+                        SlackThreadTs = d.SlackThreadTs,
+                        Helper = d.HelperMember == null ? null : new HelpMemberDto
+                        {
+                            Id = d.HelperMember.Id,
+                            Name = d.HelperMember.MemberName,
+                            Email = d.HelperMember.Email,
+                            SlackId = d.HelperMember.SlackId
+                        }
+                    }).ToList()
+                };
+                return Ok(returnReqHelp);
+
             }
             catch (Exception ex)
             {

@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Microsoft.Playwright;
 using ParkingHelp.DB;
+using ParkingHelp.Logging;
 using ParkingHelp.Models;
+using ParkingHelp.ParkingDiscountBot;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
 using System.Reflection;
@@ -15,12 +17,12 @@ var builder = WebApplication.CreateBuilder(args);
 //var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
-var filePath = Path.Combine(Directory.GetCurrentDirectory(), "DB.json");
+var filePath = Path.Combine(Directory.GetCurrentDirectory(), "Setting.json");
 var config = builder.Configuration;
 
 if (!File.Exists(filePath))
 {
-    Console.WriteLine("⚠️ DB.json 파일을 찾을 수 없습니다. 기본 설정 또는 환경변수를 사용합니다.");
+    Console.WriteLine("Setting.json 파일을 찾을 수 없습니다. 기본 설정 또는 환경변수를 사용합니다.");
     builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -36,7 +38,7 @@ if (!File.Exists(filePath))
 }
 else
 {
-    builder.Configuration.AddJsonFile("DB.json", optional: true, reloadOnChange: true);
+    builder.Configuration.AddJsonFile("Setting.json", optional: true, reloadOnChange: true);
     builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -50,6 +52,7 @@ else
         ChannelId = slackChannel ?? ""
     });
 }
+
 
 // Add services to the container.
 Console.WriteLine($"Connection String is : {builder.Configuration.GetConnectionString("DefaultConnection")}");
@@ -75,7 +78,6 @@ builder.Services.AddSwaggerGen(c =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -88,14 +90,14 @@ app.MapControllers();
 
 // log4net 설정
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());
-log4net.Config.XmlConfigurator.Configure(logRepository, new FileInfo("log4net.config"));
+Logs.Init(builder.Configuration);
 string logDirectory = "Logs";
 if (!Directory.Exists(logDirectory))
 {
     Directory.CreateDirectory(logDirectory);
 }
-var log = LogManager.GetLogger(typeof(Program));
-log.Info("서버 시작 준비 완료");
-
+Logs.Info($"Log Directory: {logDirectory}");
+ParkingDiscountManager.Initialize(app.Services,builder.Configuration);
+Logs.Info("Parking Helper Start...");
 
 app.Run();
