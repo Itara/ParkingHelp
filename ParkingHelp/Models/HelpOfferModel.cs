@@ -18,7 +18,7 @@ namespace ParkingHelp.Models
 
         [Column("status")]
         public HelpStatus Status { get; set; }
-        [Column("helper_service_date")]
+        [Column("helper_service_date", TypeName = "timestamp with time zone")]
         public DateTimeOffset? HelerServiceDate { get; set; }
 
         [Column("discount_total_count")]

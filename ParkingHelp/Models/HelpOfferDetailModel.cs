@@ -20,13 +20,13 @@ namespace ParkingHelp.Models
         [Column("request_mem_id")]
         public int? RequestMemberId { get; set; }
 
-        [Column("discount_apply_date")]
+        [Column("discount_apply_date", TypeName = "timestamp with time zone")]
         public DateTimeOffset? DiscountApplyDate { get; set; }
 
         [Column("discount_apply_type")]
         public DiscountApplyType DiscountApplyType { get; set; }
 
-        [Column("request_date")]
+        [Column("request_date", TypeName = "timestamp with time zone")]
         public DateTimeOffset? RequestDate { get; set; }
 
         [Column("slack_thread_ts")]

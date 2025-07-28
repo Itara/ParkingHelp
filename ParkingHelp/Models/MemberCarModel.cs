@@ -15,9 +15,9 @@ namespace ParkingHelp.Models
         public int MemberId { get; set; }
         [Column("car_number")]
         public string CarNumber { get; set; } = string.Empty;
-        [Column("create_date")]
+        [Column("create_date", TypeName = "timestamp with time zone")]
         public DateTimeOffset CreateDate { get; set; } = DateTimeOffset.UtcNow;
-        [Column("update_date")]
+        [Column("update_date",TypeName = "timestamp with time zone")]
         public DateTimeOffset UpdateDate { get; set; } = DateTimeOffset.UtcNow;
         public MemberModel Member { get; set; } = null!;
     }

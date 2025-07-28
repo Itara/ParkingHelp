@@ -24,7 +24,7 @@ if (!File.Exists(filePath))
 {
     Console.WriteLine("Setting.json 파일을 찾을 수 없습니다. 기본 설정 또는 환경변수를 사용합니다.");
     builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")).LogTo(Console.WriteLine, LogLevel.Information));
 
     //Slack Token 설정
     var slackToken = config["Slack:BotToken"]; // 환경변수: Slack__BotToken

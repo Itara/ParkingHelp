@@ -86,22 +86,58 @@ namespace ParkingHelp.ParkingDiscountBot
                 Logs.Info($"자동 할인권 적용 시간 {autoDiscountTime ?? ""}");
                 while (true)
                 {
+                    //배치시작시간
+                    TimeOnly currentTime = TimeOnly.FromDateTime(DateTime.Now);
+                    if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) && _AutoDisCountApplyTime.Hour == currentTime.Hour && _AutoDisCountApplyTime.Minute == currentTime.Minute)
+                    {
+                        Console.WriteLine("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
+                        Logs.Info("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
+                        List<MemberDto> members = GetMemberList();
+                        foreach (MemberDto meber in members)
+                        {
+                            foreach (var car in meber.Cars)
+                            {
+                                //자동 할인권 적용 작업큐에 추가
+                                string memberEmail = meber.Email ?? string.Empty;
+                                int priority = 100; //기본 우선순위는 100, 필요시 조정 가능
+                                ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, true);
+                                _ = EnqueueAsync(discountModel, DiscountJobType.ApplyDiscount, priority);
+                            }
+                        }
+                    }
+                    else if (_config["AutoDiscountTime"] != null && _config["AutoDiscountTime"].Equals("NOW", StringComparison.CurrentCultureIgnoreCase) && isOnlyFirstRun)
+                    {
+                        Console.WriteLine("할인권 즉시 적용 상태입니다. 할인권 등록을위해 사용자 조회 시작합니다. 이작업은 작업은 한번만 실행됩니다.");
+                        Logs.Info("할인권 즉시 적용 상태입니다. 할인권 등록을위해 사용자 조회 시작합니다..");
+                        List<MemberDto> members = GetMemberList();
+                        foreach (MemberDto meber in members)
+                        {
+                            foreach (var car in meber.Cars)
+                            {
+                                //자동 할인권 적용 작업큐에 추가
+                                string memberEmail = meber.Email ?? string.Empty;
+                                int priority = 100;
+                                ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, true);
+                                _ = EnqueueAsync(discountModel, DiscountJobType.ApplyDiscount, priority);
+                            }
+                        }
+                        isOnlyFirstRun = false; //즉시 실행은 한번만 실행
+                        Logs.Info("주차할인권 즉시 적용");
+                    }
                     if (_ParkingDiscountPriorityQueue.Count == 0)
                     {
+                        Console.WriteLine("Queue Count 0....");
                         await Task.Delay(500);
                         continue;
                     }
 
-                    await CheckAutoApplyTimeForMemberDiscount(isOnlyFirstRun); //자동 할인권 적용 시간 체크
-
-
                     //큐 동기화 설정
                     await _semaphore.WaitAsync();
-                    
+
                     (ParkingDiscountModel ParkingDisCountModel, DiscountJobType jobType, TaskCompletionSource<JObject> tcs) item;
 
                     //Lock을 사용하여 작업 큐에서 항목을 안전하게 가져옴
-                    lock (_lock) 
+                    lock (_lock)
                     {
                         //PriorityQueue로 생성해서 우선순위가 높은것부터 뽑아옴
                         //우선순위
@@ -137,46 +173,9 @@ namespace ParkingHelp.ParkingDiscountBot
             });
         }
 
-        private static async Task CheckAutoApplyTimeForMemberDiscount(bool isOnlyFirstRun =false)
+        private static async Task CheckAutoApplyTimeForMemberDiscount(bool isOnlyFirstRun = false)
         {
-            //배치시작시간
-            TimeOnly currentTime = TimeOnly.FromDateTime(DateTime.Now);
-            if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) && _AutoDisCountApplyTime.Hour == currentTime.Hour && _AutoDisCountApplyTime.Minute == currentTime.Minute)
-            {
-                Console.WriteLine("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
-                Logs.Info("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
-                List<MemberDto> members = GetMemberList();
-                foreach (MemberDto meber in members)
-                {
-                    foreach (var car in meber.Cars)
-                    {
-                        //자동 할인권 적용 작업큐에 추가
-                        string memberEmail = meber.Email ?? string.Empty;
-                        int priority = 100; //기본 우선순위는 100, 필요시 조정 가능
-                        ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, true);
-                        _ = EnqueueAsync(discountModel, DiscountJobType.ApplyDiscount, priority);
-                    }
-                }
-            }
-            else if (_config["AutoDiscountTime"] != null && _config["AutoDiscountTime"].Equals("NOW", StringComparison.CurrentCultureIgnoreCase) && isOnlyFirstRun)
-            {
-                Console.WriteLine("할인권 즉시 적용 상태입니다. 할인권 등록을위해 사용자 조회 시작합니다. 이작업은 작업은 한번만 실행됩니다.");
-                Logs.Info("할인권 즉시 적용 상태입니다. 할인권 등록을위해 사용자 조회 시작합니다..");
-                List<MemberDto> members = GetMemberList();
-                foreach (MemberDto meber in members)
-                {
-                    foreach (var car in meber.Cars)
-                    {
-                        //자동 할인권 적용 작업큐에 추가
-                        string memberEmail = meber.Email ?? string.Empty;
-                        int priority = 100;
-                        ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, true);
-                        _ = EnqueueAsync(discountModel, DiscountJobType.ApplyDiscount, priority);
-                    }
-                }
-                isOnlyFirstRun = false; //즉시 실행은 한번만 실행
-                Logs.Info("주차할인권 즉시 적용");
-            }
+
         }
 
         private static void PlaywrightManager_OnParkingDiscountEvent(object? sender, ParkingDiscountResultEventArgs e)
@@ -572,8 +571,6 @@ namespace ParkingHelp.ParkingDiscountBot
                             {
                                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
                             }
-
-
                         }
                         if (alertMessage.Contains("불가능"))
                         {
