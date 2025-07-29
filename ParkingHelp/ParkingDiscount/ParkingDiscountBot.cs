@@ -83,12 +83,17 @@ namespace ParkingHelp.ParkingDiscountBot
 
                 bool isOnlyFirstRun = true; //즉시 실행이면 한번만 실행한다 
                 string? autoDiscountTime = _config["AutoDiscountTime"];
+                TimeOnly? lastRunTime = null;
+
                 Logs.Info($"자동 할인권 적용 시간 {autoDiscountTime ?? ""}");
                 while (true)
                 {
                     //배치시작시간
                     TimeOnly currentTime = TimeOnly.FromDateTime(DateTime.Now);
-                    if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) && _AutoDisCountApplyTime.Hour == currentTime.Hour && _AutoDisCountApplyTime.Minute == currentTime.Minute)
+                    if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) 
+                        && _AutoDisCountApplyTime.Hour == currentTime.Hour 
+                        && _AutoDisCountApplyTime.Minute == currentTime.Minute
+                        && (!lastRunTime.HasValue || lastRunTime != currentTime)) //같은 시간에 중복실행 방지
                     {
                         Console.WriteLine("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
                         Logs.Info("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
