@@ -93,8 +93,9 @@ namespace ParkingHelp.ParkingDiscountBot
                     if (TimeOnly.TryParse(_config["AutoDiscountTime"], out _AutoDisCountApplyTime) 
                         && _AutoDisCountApplyTime.Hour == currentTime.Hour 
                         && _AutoDisCountApplyTime.Minute == currentTime.Minute
-                        && (!lastRunTime.HasValue || lastRunTime != currentTime)) //같은 시간에 중복실행 방지
+                        && (!lastRunTime.HasValue || lastRunTime.Value.Hour != currentTime.Hour || lastRunTime.Value.Minute != currentTime.Minute)) //같은 시간에 중복실행 방지
                     {
+                        lastRunTime = new TimeOnly(currentTime.Hour, currentTime.Minute);
                         Console.WriteLine("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
                         Logs.Info("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
                         List<MemberDto> members = GetMemberList();
