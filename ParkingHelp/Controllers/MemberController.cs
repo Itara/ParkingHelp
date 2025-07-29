@@ -249,7 +249,7 @@ namespace ParkingHelp.Controllers
                                 CarNumber = c.CarNumber
                             }).FirstOrDefault()
                         },
-                        HelpDetails = req.HelpDetails.Where(x => x.ReqDetailStatus == ReqDetailStatus.Completed).Select(detail => new ReqHelpDetailDto
+                        HelpDetails = req.HelpDetails.Where(x => x.ReqDetailStatus == ReqDetailStatus.Completed && x.HelperMemberId == memberDto.Id).Select(detail => new ReqHelpDetailDto
                         {
                             Id = detail.Id,
                             ReqDetailStatus = detail.ReqDetailStatus,
