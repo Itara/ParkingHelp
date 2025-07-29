@@ -8,6 +8,7 @@ using ParkingHelp.DB;
 using ParkingHelp.DTO;
 using ParkingHelp.Logging;
 using ParkingHelp.Models;
+using ParkingHelp.ParkingDiscount;
 using ParkingHelp.SlackBot;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -599,9 +600,53 @@ namespace ParkingHelp.ParkingDiscountBot
             return jobReturn;
         }
 
+        /// <summary>
+        /// 실제 남은 할인권과 주차요금에따라 할인권을 적용하는 함수
+        /// </summary>
+        /// <param name="realFee">실제 계산할 주차요금</param>
+        /// <param name="totalRealParkingMinutes">전체 주차시간</param>
+        /// <param name="alreadyDiscountedMinutes">이미 사전 할인받은 금액</param>
+        /// <param name="inventory">주차권 종류 및 수량</param>
+        /// <param name="bufferMinutes">출차 보장 시간</param>
+        /// <returns></returns>
+        public static ParkingDiscountPlan ApplyDiscountTicketsWithInventory( int realFee,int totalRealParkingMinutes, int alreadyDiscountedMinutes, DiscountInventory inventory,int bufferMinutes = 15)
+        {
+            const int feePerBlock = 2000;
+            const int minutesPerBlock = 30;
+
+            // 1. 요금 기준 최대 커버 시간
+            int feeBlocks = (int)Math.Ceiling(realFee / (double)feePerBlock);
+            int maxMinutesByFee = feeBlocks * minutesPerBlock;
+
+            // 2. 실제 필요한 추가 할인 시간 (실주차 - 기존 할인 + 여유시간)
+            int requiredMinutes = Math.Max(0, (totalRealParkingMinutes - alreadyDiscountedMinutes) + bufferMinutes);
+
+            // 3. 실제 할인 적용할 시간 = 요금 기준 한도 vs 실제 필요한 추가 시간 중 작은 값
+            int targetMinutes = Math.Min(requiredMinutes, maxMinutesByFee);
+
+            var result = new ParkingDiscountPlan();
+
+            // 4. 그리디 적용
+            int use4h = Math.Min(targetMinutes / 240, inventory.Count4Hour);
+            result.Use4Hour = use4h;
+            targetMinutes -= use4h * 240;
+
+            int use1h = Math.Min(targetMinutes / 60, inventory.Count1Hour);
+            result.Use1Hour = use1h;
+            targetMinutes -= use1h * 60;
+
+            int use30m = Math.Min(targetMinutes / 30, inventory.Count30Min);
+            result.Use30Min = use30m;
+            targetMinutes -= use30m * 30;
+
+            result.UncoveredMinutes = targetMinutes;
+
+            return result;
+        }
+
+
         private static async Task<JObject> GetParkingFee(IPage page, int feeValue, JObject jobReturn, string carNum)
         {
-
             await page.WaitForFunctionAsync(
                "(prev) => document.querySelector('#realFee')?.value !== prev",
                  feeValue, // 최대 5초 기다림
