@@ -73,6 +73,14 @@ builder.Services.AddSwaggerGen(c =>
     });
 
     c.EnableAnnotations();
+    
+    // XML 문서 파일 경로 설정
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
 });
 
 var app = builder.Build();
