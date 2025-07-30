@@ -32,7 +32,7 @@ namespace ParkingHelp.Controllers
         public async Task<IActionResult> PostDiscountParkingFee([FromBody] ParkingDiscountFeePostParam query)
         {
 
-            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(query.CarNumber, string.Empty,query.NotifySlackAlarm ?? false);
+            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(query.CarNumber, string.Empty,query.NotifySlackAlarm ?? false , false);
             JObject result = await ParkingDiscountManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.ApplyDiscount, (int)DiscountJobPriority.High);
 
             if (result != null)

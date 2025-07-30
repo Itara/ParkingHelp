@@ -66,6 +66,8 @@ namespace ParkingHelp.ParkingDiscountBot
         /// </summary>
         public const int TIME_BLOCK_MINUTES = 30;
 
+        public static readonly TimeOnly GET_OFF_WORK_TIME = new TimeOnly(18, 0, 0);
+
 
         public static event EventHandler<ParkingDiscountResultEventArgs>? OnParkingDiscountEvent; //주차 결과 이벤트
 
@@ -117,7 +119,7 @@ namespace ParkingHelp.ParkingDiscountBot
                                 //자동 할인권 적용 작업큐에 추가
                                 string memberEmail = meber.Email ?? string.Empty;
                                 int priority = 100; //기본 우선순위는 100, 필요시 조정 가능
-                                ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, true);
+                                ParkingDiscountModel discountModel = new ParkingDiscountModel(car.CarNumber, memberEmail, false);
                                 _ = EnqueueAsync(discountModel, DiscountJobType.ApplyDiscount, priority);
                             }
                         }
@@ -169,7 +171,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         ParkingDiscountModel parkingDiscountModel = item.ParkingDisCountModel;
                         var result = item.jobType switch
                         {
-                            DiscountJobType.ApplyDiscount => await RunDiscountAsync(parkingDiscountModel.CarNumber),
+                            DiscountJobType.ApplyDiscount => await RunDiscountAsync(parkingDiscountModel.CarNumber,parkingDiscountModel.IsGetOffWorkTime),
                             DiscountJobType.CheckFeeOnly => await RunCheckFeeAsync(parkingDiscountModel.CarNumber),
                             _ => new JObject { ["Result"] = "Fail", ["ReturnMessage"] = "Unknown Job Type" }
                         };
@@ -297,10 +299,10 @@ namespace ParkingHelp.ParkingDiscountBot
             await page.CloseAsync();
             return result;
         }
-        private static async Task<JObject> RunDiscountAsync(string carNumber)
+        private static async Task<JObject> RunDiscountAsync(string carNumber,bool isGetOffWork)
         {
             var page = await _context.NewPageAsync(); // context 재사용
-            var result = await RegisterParkingDiscountAsync(carNumber, page);
+            var result = await RegisterParkingDiscountAsync(carNumber, page, isGetOffWork);
             await page.CloseAsync();
             return result;
         }
@@ -351,7 +353,7 @@ namespace ParkingHelp.ParkingDiscountBot
         /// <param name="page">브라우저 객체(Playwright)</param>
         /// <param name="notifySlackChannel">해당 결과를 슬랙 채널에 결과 전송을 할지</param>
         /// <returns></returns>
-        public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, IPage page, bool notifySlackChannel = false)
+        public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, IPage page, bool notifySlackChannel = false,bool isGetOffWork = true)
         {
             JObject jobReturn = new JObject
             {
@@ -421,9 +423,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         string numericPart = System.Text.RegularExpressions.Regex.Replace(feeValueText, @"[^0-9]", "");
                         int feeValue = int.Parse(numericPart);
 
-                       
-                        jobReturn = await ApplyDiscount(feeValue, carNum, page, jobReturn);
-                     
+                        jobReturn = await ApplyDiscount(feeValue, carNum, page, jobReturn,isGetOffWork);
                     }
                     else if (carNoList.Count > 1)
                     {
@@ -478,7 +478,7 @@ namespace ParkingHelp.ParkingDiscountBot
         /// <param name="page">브라우저 객체</param>
         /// <param name="jobReturn">결과를 전송받은 JObject</param>
         /// <returns>jobReturn</returns>
-        private static async Task<JObject> ApplyDiscount(int feeValue, string carNum, IPage page, JObject jobReturn)
+        private static async Task<JObject> ApplyDiscount(int feeValue, string carNum, IPage page, JObject jobReturn, bool isGetOffWork = true)
         {
             var now = DateTime.Now;
             var today = now.DayOfWeek;
@@ -613,9 +613,13 @@ namespace ParkingHelp.ParkingDiscountBot
             return jobReturn;
         }
 
-       
-
-        private static int GetTotalParkingMinutes(string inputMsg)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="inputMsg"></param>
+        /// <param name="isGetOffWork"></param>
+        /// <returns></returns>
+        private static int GetTotalParkingMinutes(string inputMsg, bool isGetOffWork = false )
         {
             int totalMinutes = 0;
 
@@ -638,6 +642,13 @@ namespace ParkingHelp.ParkingDiscountBot
             if (minMatch.Success)
             {
                 totalMinutes += int.Parse(minMatch.Groups[1].Value);
+            }
+
+            //배치로 돌리는 차량은 GET_OFF_WORK_TIME이후에 출차기준으로 추가 시간 부여
+            if (!isGetOffWork && TimeOnly.FromDateTime(DateTime.Now) <= GET_OFF_WORK_TIME) 
+            {
+                TimeOnly now = TimeOnly.FromDateTime(DateTime.Now);
+                totalMinutes += (int)(GET_OFF_WORK_TIME.ToTimeSpan() - now.ToTimeSpan()).TotalMinutes;
             }
 
             return totalMinutes;
@@ -692,11 +703,13 @@ namespace ParkingHelp.ParkingDiscountBot
                 var cells = await row.QuerySelectorAllAsync("td");
                 if (cells.Count < 2) continue;
 
-                var discountText = await cells[1].InnerTextAsync();
+                var titleText = (await cells[0].InnerTextAsync()).Trim();
 
-                if (discountText.Contains("8000")) // "8000 원" 포함된 경우
+                if (titleText == "방문자주차권")
                 {
-                    var cancelButton = await row.QuerySelectorAsync("button[id^='delete']");
+                    // 5열의 버튼 찾기
+                    var cancelButton = await cells[4].QuerySelectorAsync("button[id^='delete']");
+
                     if (cancelButton != null)
                     {
                         result.Add(cancelButton);
