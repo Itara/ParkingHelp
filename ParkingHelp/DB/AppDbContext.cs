@@ -37,21 +37,18 @@ namespace ParkingHelp.DB
             modelBuilder.Entity<MemberCarModel>().ToTable("member_car");
             modelBuilder.Entity<ReqHelpModel>().ToTable("req_help");
             modelBuilder.Entity<ReqHelpDetailModel>().ToTable("req_help_detail");
-            modelBuilder.Entity<HelpOfferModel>().ToTable("help_offer"); 
+            modelBuilder.Entity<HelpOfferModel>().ToTable("help_offer");
             modelBuilder.Entity<HelpOfferDetailModel>().ToTable("help_offer_detail");
             modelBuilder.Entity<FavoriteMemberModel>().ToTable("member_favorites");
 
-            //    // UTC DateTimeOffset 컨벤션 일괄 적용 -> Azure 시간 한국으로 일괄 설정함 (서버 및 DB모두)
-            //foreach (var entity in modelBuilder.Model.GetEntityTypes())
-            //{
-            //    foreach (var property in entity.GetProperties().Where(p => p.ClrType == typeof(DateTimeOffset)))
-            //    {
-            //        property.SetValueConverter(new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTimeOffset, DateTimeOffset>(
-            //            v => v.Kind == DateTimeOffsetKind.Unspecified ? DateTimeOffset.SpecifyKind(v, DateTimeOffsetKind.Utc) : v,
-            //            v => DateTimeOffset.SpecifyKind(v, DateTimeOffsetKind.Utc)
-            //        ));
-            //    }
-            //}
+            foreach (var entity in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entity.GetProperties()
+                         .Where(p => p.ClrType == typeof(DateTimeOffset) || p.ClrType == typeof(DateTimeOffset?)))
+                {
+                    property.SetColumnType("timestamp with time zone");
+                }
+            }
 
             //Member ↔ MemberCar (1:N)
             modelBuilder.Entity<MemberCarModel>()
@@ -60,7 +57,14 @@ namespace ParkingHelp.DB
                 .HasForeignKey(mc => mc.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-                // ReqHelp ↔ Member (요청자)
+
+            modelBuilder.Entity<MemberCarModel>(entity =>
+            {
+                entity.Property(e => e.CreateDate)
+                      .HasColumnType("timestamp with time zone");
+            });
+
+            // ReqHelp ↔ Member (요청자)
             modelBuilder.Entity<ReqHelpModel>()
                 .HasOne(r => r.HelpReqMember)
                 .WithMany(m => m.HelpRequests)

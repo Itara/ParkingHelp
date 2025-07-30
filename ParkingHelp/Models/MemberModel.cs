@@ -19,7 +19,7 @@ namespace ParkingHelp.Models
         public string MemberName { get; set; } = string.Empty;
         [Column("email")]
         public string Email { get; set; } = string.Empty;
-        [Column("create_date")]
+        [Column("create_date", TypeName = "timestamp with time zone")]
         [DatabaseGenerated(DatabaseGeneratedOption.Identity)]  
         public DateTimeOffset CreateDate { get; set; } = DateTimeOffset.UtcNow;
         [Column("slack_id")]
