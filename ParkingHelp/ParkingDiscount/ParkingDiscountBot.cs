@@ -421,18 +421,9 @@ namespace ParkingHelp.ParkingDiscountBot
                         string numericPart = System.Text.RegularExpressions.Regex.Replace(feeValueText, @"[^0-9]", "");
                         int feeValue = int.Parse(numericPart);
 
-                        // 4. 주차금액이 0보다 크면 방문자주차권 버튼 클릭
-                        if (feeValue > 0)
-                        {
-                            jobReturn = await ApplyDiscount(feeValue, carNum, page, jobReturn);
-                        }
-                        else
-                        {
-                            jobReturn["Result"] = "OK";
-                            jobReturn["ReturnMessage"] = "주차금액이 0원이므로 할인권 적용 생략";
-                            jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.NoFee);
-                            Console.WriteLine("주차금액이 0원이므로 할인권 적용 생략");
-                        }
+                       
+                        jobReturn = await ApplyDiscount(feeValue, carNum, page, jobReturn);
+                     
                     }
                     else if (carNoList.Count > 1)
                     {
@@ -527,7 +518,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
                 Console.WriteLine($"첫번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
             }
-            else if (!await discountButton.IsVisibleAsync()) //이미 방문자 할인권 소진 완료
+            else if (!await discountButton.IsVisibleAsync())  //할인권 버튼을 못찾음
             {
                 Console.WriteLine("방문자주차권 버튼을 찾을 수 없습니다.");
                 jobReturn["Result"] = "Fail";
@@ -608,7 +599,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 if(feeValueAfter == 0)
                 {
                     jobReturn["Result"] = "OK";
-                    jobReturn["ReturnMessage"] = "할인권 적용완료";
+                    jobReturn["ReturnMessage"] = $"차량번호: {carNum} 할인권 적용완료";
                     jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
                 }
             }
