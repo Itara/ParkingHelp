@@ -26,6 +26,10 @@ namespace ParkingHelp.Models
         [Column("discount_apply_count")]
         public int? DiscountApplyCount { get; set; }
 
+        // 직접 완료를 등록 했는지 여부
+        [Column("help_offer_type")]
+        public HelpOfferType HelpOfferType { get; set; }
+
         public ICollection<HelpOfferDetailModel> HelpDetails { get; set; } = new List<HelpOfferDetailModel>();
 
         [Column("slack_thread_ts")]

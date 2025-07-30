@@ -62,4 +62,10 @@ namespace ParkingHelp.Models
         Error = 99// 오류 발생
     }
 
+    public enum HelpOfferType
+    {
+        OfferOnly = 0, // 제안 등록만
+        ImmediateComplete = 1 // 제안 등록과 완료를 동시에 처리
+    }
+
 }

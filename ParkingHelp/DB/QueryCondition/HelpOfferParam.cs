@@ -2,6 +2,7 @@
 using ParkingHelp.Models;
 using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 
 namespace ParkingHelp.DB.QueryCondition
 {
@@ -82,5 +83,26 @@ namespace ParkingHelp.DB.QueryCondition
         public int? ReqMemberId { get; set; }
 
 
+    }
+
+    public class CompleteHelpOfferParam
+    {
+        [Required]
+        [SwaggerSchema("도움 제공자 ID", Format = "integer")]
+        public int HelperMemId { get; set; }
+        
+        [Required]
+        [SwaggerSchema("도움 받을 사람들 정보 (ID + 할인 타입)", Format = "array")]
+        public List<RequesterWithDiscountParam> Requesters { get; set; } = null!;
+    }
+
+    public class RequesterWithDiscountParam
+    {
+        [Required]
+        [SwaggerSchema("도움 받을 사람 ID", Format = "integer")]
+        public int RequesterId { get; set; }
+        
+        [SwaggerSchema("할인 적용 타입 (0: 적용안됨, 1: 카페, 2: 식당)", Format = "integer")]
+        public DiscountApplyType DiscountApplyType { get; set; } = DiscountApplyType.None;
     }
 }

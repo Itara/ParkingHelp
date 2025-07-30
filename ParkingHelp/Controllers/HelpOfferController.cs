@@ -54,6 +54,7 @@ namespace ParkingHelp.Controllers
                     HelperServiceDate = h.HelerServiceDate,
                     DiscountTotalCount = h.DiscountTotalCount,
                     DiscountApplyCount = h.DiscountApplyCount,
+                    HelpOfferType = h.HelpOfferType,
                     SlackThreadTs = h.SlackThreadTs,
                     Helper = new HelpMemberDto
                     {
@@ -117,7 +118,8 @@ namespace ParkingHelp.Controllers
                     Status = HelpStatus.Waiting,
                     HelerServiceDate = DateTimeOffset.UtcNow,
                     DiscountTotalCount = query.TotalDisCount,
-                    DiscountApplyCount = 0
+                    DiscountApplyCount = 0,
+                    HelpOfferType = HelpOfferType.OfferOnly
                 };
 
                 _context.HelpOffers.Add(newHelpOffer);
@@ -476,6 +478,127 @@ namespace ParkingHelp.Controllers
             }
         }
 
+
+        /// <summary>
+        /// 사용자가 직접 주차 등록과 완료를 동시에 하는 경우 사용
+        /// </summary>
+        /// <param name="query">
+        /// 완료할 도움 정보
+        /// - helperMemId: 도움을 제공한 사람의 ID (필수)
+        /// - requesterIds: 도움을 받은 사람들의 ID 목록 (필수, 최소 1개 이상)
+        /// </param>
+        /// <returns>완료된 HelpOffer 정보 (Helper, HelpOfferDetail 포함)</returns>
+        /// <response code="200">성공적으로 완료 처리됨</response>
+        /// <response code="400">필수 필드 누락 또는 잘못된 데이터</response>
+        /// <response code="404">도움을 제공할 사람을 찾을 수 없음</response>
+        [HttpPost("Complete")]
+        public async Task<IActionResult> CompleteHelpOffer([FromBody] CompleteHelpOfferParam query)
+        {
+            try
+            {
+                // 1. 도움을 제공할 사람이 존재하는지 확인
+                var helperMember = await _context.Members.FirstOrDefaultAsync(m => m.Id == query.HelperMemId);
+                if (helperMember == null)
+                {
+                    return NotFound("도움을 제공할 사람을 찾을 수 없습니다.");
+                }
+
+                // 2. 새로운 HelpOffer 생성 (완료 상태)
+                var helpOffer = new HelpOfferModel
+                {
+                    HelperMemId = query.HelperMemId,  // 도움을 제공할 사람의 ID
+                    Status = HelpStatus.Completed,  // 바로 완료
+                    HelerServiceDate = DateTimeOffset.UtcNow,
+                    DiscountTotalCount = query.Requesters.Count,
+                    DiscountApplyCount = query.Requesters.Count,  // 바로 적용 완료
+                    HelpOfferType = HelpOfferType.ImmediateComplete // 직접 완료
+                };
+
+                // 트랜잭션 시작
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    _context.HelpOffers.Add(helpOffer);
+                    await _context.SaveChangesAsync();  // ID 생성
+
+                    // 3. HelpOfferDetail들 생성 (완료 상태)
+                    foreach (var requester in query.Requesters)
+                    {
+                        var detail = new HelpOfferDetailModel
+                        {
+                            HelpOfferId = helpOffer.Id,  // 새로 생성된 ID
+                            RequestMemberId = requester.RequesterId,
+                            ReqDetailStatus = ReqDetailStatus.Completed,
+                            DiscountApplyDate = DateTimeOffset.UtcNow,
+                            RequestDate = DateTimeOffset.UtcNow,
+                            DiscountApplyType = requester.DiscountApplyType
+                        };
+                        _context.HelpOffersDetail.Add(detail);
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+
+                // 3. 생성된 데이터를 DTO로 반환
+                await _context.Entry(helpOffer).Reference(h => h.HelperMember).LoadAsync();
+                await _context.Entry(helpOffer).Collection(h => h.HelpDetails)
+                    .Query().Include(d => d.RequestMember).ThenInclude(m => m.Cars).LoadAsync();
+
+                Console.WriteLine($"helpOffer.HelpOfferType: {helpOffer.HelpOfferType} (값: {(int)helpOffer.HelpOfferType})");
+                
+                var completedDto = new HelpOfferDTO
+                {
+                    Id = helpOffer.Id,
+                    Status = helpOffer.Status,
+                    HelperServiceDate = helpOffer.HelerServiceDate,
+                    DiscountTotalCount = helpOffer.DiscountTotalCount,
+                    DiscountApplyCount = helpOffer.DiscountApplyCount,
+                    HelpOfferType = helpOffer.HelpOfferType,
+                    SlackThreadTs = helpOffer.SlackThreadTs,
+                    Helper = new HelpMemberDto
+                    {
+                        Id = helpOffer.HelperMember.Id,
+                        Name = helpOffer.HelperMember.MemberName,
+                        Email = helpOffer.HelperMember.Email,
+                        SlackId = helpOffer.HelperMember.SlackId
+                    },
+                    HelpOfferDetail = helpOffer.HelpDetails.Select(d => new HelpOfferDetailDTO
+                    {
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        DiscountApplyType = d.DiscountApplyType,
+                        RequestDate = d.RequestDate,
+                        HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                        {
+                            Id = d.RequestMember.Id,
+                            HelpRequesterName = d.RequestMember.MemberName,
+                            RequesterEmail = d.RequestMember.Email,
+                            SlackId = d.RequestMember.SlackId,
+                            ReqHelpCar = d.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                            {
+                                Id = c.Id,
+                                CarNumber = c.CarNumber
+                            }).FirstOrDefault()
+                        }
+                    }).ToList()
+                };
+                
+
+                return Ok(completedDto);
+            }
+            catch (Exception ex)
+            {
+                JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
+                return BadRequest(jResult.ToString());
+            }
+        }
 
         private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
         {
