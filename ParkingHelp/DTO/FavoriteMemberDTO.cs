@@ -6,15 +6,13 @@ namespace ParkingHelp.DTO
         public int MemberId { get; set; }
         public int FavoriteMemberId { get; set; }
         public string FavoriteMemberName { get; set; } = string.Empty;
-        public DateTimeOffset CreateDate { get; set; }
-        public DateTimeOffset UpdateDate { get; set; }
+        public string DelYn { get; set; } = string.Empty;
     }
 
     public class FavoriteMemberListDTO
     {
-        public int Id { get; set; }
-        public int FavoriteMemberId { get; set; }
         public string FavoriteMemberName { get; set; } = string.Empty;
-        public DateTimeOffset CreateDate { get; set; }
+        public int FavoriteMemberId { get; set; }
+        public string CarNumber { get; set; } = string.Empty;
     }
 }

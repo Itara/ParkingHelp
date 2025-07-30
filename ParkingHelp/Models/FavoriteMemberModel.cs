@@ -17,9 +17,6 @@ namespace ParkingHelp.Models
         [Column("favorite_member_id")]
         public int FavoriteMemberId { get; set; }
 
-        [Column("favorite_member_name")]
-        public string FavoriteMemberName { get; set; } = string.Empty;
-
         [Column("del_yn")]
         public string DelYn { get; set; } = "N";
 
