@@ -15,6 +15,22 @@ namespace ParkingHelp.DB
         public DbSet<FavoriteMemberModel> FavoriteMembers { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // DateTimeOffset 컬럼들을 timestamp with time zone으로 강제 매핑
+            foreach (var entity in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entity.GetProperties()
+                    .Where(p => p.ClrType == typeof(DateTimeOffset) || p.ClrType == typeof(DateTimeOffset?)))
+                {
+                    property.SetColumnType("timestamp with time zone");
+                }
+            }
+
+            modelBuilder.Entity<MemberCarModel>(entity =>
+            {
+                entity.Property(e => e.CreateDate)
+                      .HasColumnType("timestamp with time zone");
+            });
+
             // 테이블명 설정 ( PostgreSQL은 테이블 명을 소문자로 하는게 네이밍 규칙이라 소문자로 정의)
 
             modelBuilder.Entity<MemberModel>().ToTable("member");
@@ -86,19 +102,19 @@ namespace ParkingHelp.DB
                .HasForeignKey(d => d.RequestMemberId)
                .OnDelete(DeleteBehavior.Cascade);
 
-            // FavoriteMember ↔ Member (즐겨찾기 하는 회원)
-            modelBuilder.Entity<FavoriteMemberModel>()
-                .HasOne(f => f.Member)
-                .WithMany()
-                .HasForeignKey(f => f.MemberId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // // FavoriteMember ↔ Member (즐겨찾기 하는 회원)
+            // modelBuilder.Entity<FavoriteMemberModel>()
+            //     .HasOne(f => f.Member)
+            //     .WithMany()
+            //     .HasForeignKey(f => f.MemberId)
+            //     .OnDelete(DeleteBehavior.Cascade);
 
-            // FavoriteMember ↔ Member (즐겨찾기 당하는 회원)
-            modelBuilder.Entity<FavoriteMemberModel>()
-                .HasOne(f => f.FavoriteMember)
-                .WithMany()
-                .HasForeignKey(f => f.FavoriteMemberId)
-                .OnDelete(DeleteBehavior.Cascade);
+            // // FavoriteMember ↔ Member (즐겨찾기 당하는 회원)
+            // modelBuilder.Entity<FavoriteMemberModel>()
+            //     .HasOne(f => f.FavoriteMember)
+            //     .WithMany()
+            //     .HasForeignKey(f => f.FavoriteMemberId)
+            //     .OnDelete(DeleteBehavior.Cascade);
 
         }
     }
