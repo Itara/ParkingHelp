@@ -53,7 +53,7 @@ namespace ParkingHelp.Controllers
                 result = new JObject();
                 result.Add("Result", "Fail");
                 result.Add("ReturnMessage", "할인권 요청중 오류가 발생했습니다.");
-                await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
+                //await _slackNotifier.SendMessageAsync($"{result["ReturnMessage"].ToString()}", null);
                 return BadRequest(result.ToString());
             }
         }

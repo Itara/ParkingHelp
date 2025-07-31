@@ -42,19 +42,19 @@ namespace ParkingHelp.SlackBot
         /// <param name="userId">사용자 고유 SlackID</param>
         /// <param name="slackThreadTs">null일시 채팅 값이있으면 쓰레드 댓글</param>
         /// <returns></returns>
-        public async Task<JObject> SendMessageAsync(string message,string? slackThreadTs = null)
+        public async Task<JObject> SendMessageAsync(string message, string? slackThreadTs = null)
         {
-           
-            JObject request  = new JObject
+
+            JObject request = new JObject
             {
                 ["channel"] = _sendChannelID,
                 ["text"] = message,
                 ["link_names"] = true,
-                
+
             };
             if (!string.IsNullOrEmpty(slackThreadTs))
             {
-                request .Add("thread_ts", slackThreadTs);
+                request.Add("thread_ts", slackThreadTs);
             }
             Console.WriteLine($"BotToken : {_botToken} , channel : {request["channel"]} {request["message"]}");
             var json = JsonConvert.SerializeObject(request, new JsonSerializerSettings
@@ -81,11 +81,53 @@ namespace ParkingHelp.SlackBot
                 }
                 else
                 {
-                    Console.WriteLine ("슬랙 메시지 전송 성공!");
+                    Console.WriteLine("슬랙 메시지 전송 성공!");
                     return JObject.Parse(responseText);
                 }
             }
         }
+
+       
+        /// <summary>
+        /// 개인 DM보내기
+        /// </summary>
+        /// <param name="message">전달 메세지</param>
+        /// <param name="userID">고유 SlackID</param>
+        /// <returns></returns>
+        public async Task<JObject> SendDMAsync(string message, string userID)
+        {
+
+            var channelRes = await _httpClient.PostAsync(
+        "https://slack.com/api/conversations.open",
+        new StringContent(JsonConvert.SerializeObject(new { users = userID }), Encoding.UTF8, "application/json"));
+
+            var channelObj = JObject.Parse(await channelRes.Content.ReadAsStringAsync());
+            string channelId = channelObj["channel"]?["id"]?.ToString() ?? "";
+
+            var response = await _httpClient.PostAsync(
+                "https://slack.com/api/chat.postMessage",
+                new StringContent(JsonConvert.SerializeObject(new { channel = channelId, text = message }), Encoding.UTF8, "application/json"));
+
+            string responseText = await response.Content.ReadAsStringAsync(); // ✅ 여기 추가됨
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("슬랙 메시지 전송 실패: " + response.StatusCode);
+                return JObject.Parse(responseText); // 여기서 responseText를 사용해야 함
+            }
+
+            JObject responseJobj = JObject.Parse(responseText);
+            if (!Convert.ToBoolean(responseJobj["ok"]))
+            {
+                Console.WriteLine("슬랙 메시지 전송 실패");
+                return responseJobj;
+            }
+
+            Console.WriteLine("슬랙 메시지 전송 성공!");
+            return responseJobj;
+        }
+
+
 
         public async Task<SlackUserByEmail?> FindUserByEmailAsync(string email)
         {

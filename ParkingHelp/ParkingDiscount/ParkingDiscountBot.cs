@@ -97,7 +97,6 @@ namespace ParkingHelp.ParkingDiscountBot
                     Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 });
 
-                
                 if (File.Exists(SessionFilePath))
                 {
                     _context = await _browser.NewContextAsync(new()
@@ -126,13 +125,8 @@ namespace ParkingHelp.ParkingDiscountBot
                     // 세션 저장
                     string storageStateJson = await _context.StorageStateAsync();
                     await File.WriteAllTextAsync(SessionFilePath, storageStateJson);
-
-                    // page는 닫아도 context는 살아있음
                     await page.CloseAsync();
-
                 }
-
-                
 
                 bool isOnlyFirstRun = true; //즉시 실행이면 한번만 실행한다 
                 string? autoDiscountTime = _config["AutoDiscountTime"];
@@ -235,7 +229,11 @@ namespace ParkingHelp.ParkingDiscountBot
         private static void PlaywrightManager_OnParkingDiscountEvent(object? sender, ParkingDiscountResultEventArgs e)
         {
             Console.WriteLine($"차량번호: {e.CarNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} ");
-            _ = Task.Run(() => SendParkingDiscountResult(e));
+            if (e.IsNotifySlack)
+            {
+                _ = Task.Run(() => SendParkingDiscountResult(e));
+            }
+            
         }
 
         /// <summary>
@@ -251,21 +249,16 @@ namespace ParkingHelp.ParkingDiscountBot
             if (e.IsNotifySlack)
             {
                 SlackUserByEmail? userInfo = await slackNotifier.FindUserByEmailAsync(e.MemberEmail);
-                string userId = userInfo?.Id ?? "";
-                userId = !string.IsNullOrEmpty(userId) ? $"<@{userId}>" : string.Empty;
+                string userId = userInfo?.Id ?? "U07K1ET8Q1M";
+                //userId = !string.IsNullOrEmpty(userId) ? $"<@{userId}>" : string.Empty;
                 switch (Convert.ToInt32(e.Result["ResultType"]))
                 {
                     case (int)DisCountResultType.Success:
                         Logs.Info($"차량번호: {carNumber} 할인권 적용 완료");
-                        break;
-                    case (int)DisCountResultType.SuccessButFee:
-                        await slackNotifier.SendMessageAsync($"{userId} {e.Result["ReturnMessage"]}", null);
+                        _ =Task.Run(() => slackNotifier.SendDMAsync($"차량번호: {carNumber} 할인권 적용 완료", userId));
                         break;
                     case (int)DisCountResultType.CarMoreThanTwo:
                         await slackNotifier.SendMessageAsync($"{userId} 차량번호: {carNumber} 할인권 적용 결과: 차량정보가 2대 이상입니다.", null);
-                        break;
-                    case (int)DisCountResultType.AlreadyUse:
-                        await slackNotifier.SendMessageAsync($"{userId} 차량번호: {carNumber} 이미 방문자 할인권을 사용했습니다.", null);
                         break;
                     case (int)DisCountResultType.NoFee:
                     case (int)DisCountResultType.NotFound:
@@ -340,7 +333,7 @@ namespace ParkingHelp.ParkingDiscountBot
         }
         private static async Task<JObject> RunDiscountAsync(string carNumber,bool isGetOffWork)
         {
-            var page = await _context.NewPageAsync(); // context 재사용
+            var page = await _context.NewPageAsync(); //신규 페이지 생성 후 page객체 전송
             await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/discount-search/original", new()
             {
                 WaitUntil = WaitUntilState.NetworkIdle
@@ -407,7 +400,6 @@ namespace ParkingHelp.ParkingDiscountBot
             };
             try
             {
-                
                 // 로그인 후 URL 또는 특정 요소 대기 (필요시 수정)
                 // 1. 차량번호 텍스트박스 입력
                 await page.FillAsync("#carNo", $"{carNumber}");
@@ -483,7 +475,13 @@ namespace ParkingHelp.ParkingDiscountBot
             }
             finally
             {
-                await page.CloseAsync(); // 메모리 누수 방지
+                // TODO: 메모리 누수 방지 및 할인권 적용 전략
+                // 페이지를 닫지않으면 리다이렉트만해서 좀 더 페이지 생성 및 이동을 할 필요가없지만
+                // 기본 권장사항은 페이지를 닫는것임.(Playwright 공식문서 참고) 
+                // 다만 좀 더 할인권 적용 속도를 개선을 할 필요가잇으면 좀 더 전략적으로 페이지관리 방법을 생각해야함
+                // 또한 페이지를 닫지않으면 Playwright가 메모리를 계속 사용하게 되므로(불필요한 JS 사용 및 GC동작이 안됨)
+                // 현재는 메모리 누수 방지를위해 페이지를 닫음
+                await page.CloseAsync();
             }
             return jobReturn;
         }
@@ -662,12 +660,13 @@ namespace ParkingHelp.ParkingDiscountBot
             {
                 totalMinutes += int.Parse(minMatch.Groups[1].Value);
             }
-
+            Console.WriteLine($"현재까지 입차시간 {totalMinutes}분");
             //배치로 돌리는 차량은 GET_OFF_WORK_TIME이후에 출차기준으로 추가 시간 부여
             if (!isGetOffWork && TimeOnly.FromDateTime(DateTime.Now) <= GET_OFF_WORK_TIME) 
             {
                 TimeOnly now = TimeOnly.FromDateTime(DateTime.Now);
                 totalMinutes += (int)(GET_OFF_WORK_TIME.ToTimeSpan() - now.ToTimeSpan()).TotalMinutes;
+                Console.WriteLine($"현재시간 {DateTime.Now.ToString("HH:mm:ss")}입니다 출차시간을 {GET_OFF_WORK_TIME.ToString("HH:mm:ss")}기준으로 하여 출차시간을 {totalMinutes}분으로 계산하여 진행합니다");
             }
 
             totalMinutes -= FREE_PARKING_MINUTES; //기본 무료 주차시간
