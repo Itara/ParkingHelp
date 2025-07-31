@@ -104,7 +104,7 @@ namespace ParkingHelp.SlackBot
                 };
             }
 
-            Console.WriteLine("사용자 조회 실패: " + obj["error"]);
+            Console.WriteLine("FindUserByEmailAsync() : Slack 사용자 조회 실패: " + obj["error"]);
             return null;
         }
     }

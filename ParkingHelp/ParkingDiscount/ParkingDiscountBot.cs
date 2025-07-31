@@ -60,17 +60,21 @@ namespace ParkingHelp.ParkingDiscountBot
         /// 시간 블록당 요금 (예: TIME_BLOCK_MINUTES당 2000원)
         /// </summary>
         public const int FEE_PER_TIME_BLOCK = 2000;
-
         /// <summary>
         /// 요금이 적용되는 시간 블록 단위 
         /// </summary>
         public const int TIME_BLOCK_MINUTES = 30;
+        /// <summary>
+        /// 요금 정산 후 출차까지 보장시간
+        /// </summary>
+        public const int BUFFER_OUT_TIME_MINUTES = 15;
 
+        public const int FREE_PARKING_MINUTES = 30; //무료 주차 시간 (15분)
         public static readonly TimeOnly GET_OFF_WORK_TIME = new TimeOnly(18, 0, 0);
 
-
+        //퇴근시간 버퍼 시간 (10분)
         public static event EventHandler<ParkingDiscountResultEventArgs>? OnParkingDiscountEvent; //주차 결과 이벤트
-
+        public static string SessionFilePath = Path.Combine(AppContext.BaseDirectory, "session.json");
         public static void Initialize(IServiceProvider services, IConfiguration config)
         {
             //DI주입
@@ -92,7 +96,43 @@ namespace ParkingHelp.ParkingDiscountBot
                     Headless = true,
                     Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 });
-                _context = await _browser.NewContextAsync();
+
+                
+                if (File.Exists(SessionFilePath))
+                {
+                    _context = await _browser.NewContextAsync(new()
+                    {
+                        StorageStatePath = SessionFilePath,
+                        ViewportSize = null,
+                        BypassCSP = true,
+                        IgnoreHTTPSErrors = true
+                    });
+                }
+                else
+                {
+                    _context = await _browser.NewContextAsync();  // 이걸 tempContext로 안하고 바로 _context로 설정
+                    var page = await _context.NewPageAsync();
+
+                    await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
+                    {
+                        WaitUntil = WaitUntilState.NetworkIdle
+                    });
+
+                    await page.FillAsync("#id", "C2115");
+                    await page.FillAsync("#password", "6636");
+                    await page.ClickAsync("#loginBtn");
+                    await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+                    // 세션 저장
+                    string storageStateJson = await _context.StorageStateAsync();
+                    await File.WriteAllTextAsync(SessionFilePath, storageStateJson);
+
+                    // page는 닫아도 context는 살아있음
+                    await page.CloseAsync();
+
+                }
+
+                
 
                 bool isOnlyFirstRun = true; //즉시 실행이면 한번만 실행한다 
                 string? autoDiscountTime = _config["AutoDiscountTime"];
@@ -192,15 +232,10 @@ namespace ParkingHelp.ParkingDiscountBot
             });
         }
 
-        private static async Task CheckAutoApplyTimeForMemberDiscount(bool isOnlyFirstRun = false)
-        {
-
-        }
-
         private static void PlaywrightManager_OnParkingDiscountEvent(object? sender, ParkingDiscountResultEventArgs e)
         {
             Console.WriteLine($"차량번호: {e.CarNumber} 할인권 적용 결과: {e.Result["Result"]} Message : {e.Result["ReturnMessage"]} ");
-            _ = SendParkingDiscountResult(e); //비동기로 슬랙에 결과 알림
+            _ = Task.Run(() => SendParkingDiscountResult(e));
         }
 
         /// <summary>
@@ -274,7 +309,7 @@ namespace ParkingHelp.ParkingDiscountBot
         /// <summary>
         /// 할인권 적용 작업큐에 신규 리스트 추가
         /// </summary>
-        /// <param name="carNumber"></param>
+        /// <param name="discountModel">주차 정산 관련 model</param>
         /// <param name="jobType">주차요금 조회 or 할인권 조회</param>
         /// <param name="priority">실행 우선순위 (0이 될수록 우선순위 증가 즉시 할인권 적용하려면 낮게 설정)</param>
         /// <returns></returns>
@@ -295,6 +330,10 @@ namespace ParkingHelp.ParkingDiscountBot
         private static async Task<JObject> RunCheckFeeAsync(string carNumber)
         {
             var page = await _context.NewPageAsync();
+            await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/discount-search/original", new()
+            {
+                WaitUntil = WaitUntilState.NetworkIdle
+            });
             var result = await CheckParkingFeeOnlyAsync(carNumber, page);
             await page.CloseAsync();
             return result;
@@ -302,6 +341,10 @@ namespace ParkingHelp.ParkingDiscountBot
         private static async Task<JObject> RunDiscountAsync(string carNumber,bool isGetOffWork)
         {
             var page = await _context.NewPageAsync(); // context 재사용
+            await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/discount-search/original", new()
+            {
+                WaitUntil = WaitUntilState.NetworkIdle
+            });
             var result = await RegisterParkingDiscountAsync(carNumber, page, isGetOffWork);
             await page.CloseAsync();
             return result;
@@ -352,8 +395,9 @@ namespace ParkingHelp.ParkingDiscountBot
         /// <param name="carNumber">차량번호</param>
         /// <param name="page">브라우저 객체(Playwright)</param>
         /// <param name="notifySlackChannel">해당 결과를 슬랙 채널에 결과 전송을 할지</param>
+        /// <param name="isGetOffWork">현재 퇴근 여부(True = 현재시간 계산 False = 퇴근시간(6시) 기준)</param>
         /// <returns></returns>
-        public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, IPage page, bool notifySlackChannel = false,bool isGetOffWork = true)
+        public static async Task<JObject> RegisterParkingDiscountAsync(string carNumber, IPage page, bool notifySlackChannel = false,bool isGetOffWork = false)
         {
             JObject jobReturn = new JObject
             {
@@ -363,33 +407,7 @@ namespace ParkingHelp.ParkingDiscountBot
             };
             try
             {
-                Console.WriteLine("로그인 페이지 이동 중...");
-                if (page.Url.Contains("login"))
-                {
-                    Console.WriteLine("로그인 필요 → 로그인 시작");
-                }
-                await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
-                {
-                    WaitUntil = WaitUntilState.NetworkIdle
-                });
-
-                if (page.Url.Contains("login")) //로그인 이후 자동으로 메인페이지 리다이렉트됨
-                {
-                    await page.WaitForSelectorAsync("#id");
-                    await page.FillAsync("#id", "C2115");
-                    await page.FillAsync("#password", "6636");
-                    await page.ClickAsync("#loginBtn");
-                    await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
-                    Console.WriteLine("로그인 완료");
-                }
-                else
-                {
-                    await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/discount-search/original", new()
-                    {
-                        WaitUntil = WaitUntilState.NetworkIdle
-                    });
-                }
-
+                
                 // 로그인 후 URL 또는 특정 요소 대기 (필요시 수정)
                 // 1. 차량번호 텍스트박스 입력
                 await page.FillAsync("#carNo", $"{carNumber}");
@@ -442,8 +460,8 @@ namespace ParkingHelp.ParkingDiscountBot
                     {
                         jobReturn = new JObject
                         {
-                            ["Result"] = "Fail",
-                            ["ReturnMessage"] = $"차량번호 {carNumber}는 미등록 차량입니다.",
+                            ["Result"] = "OK",
+                            ["ReturnMessage"] = $"차량번호 {carNumber}는 입차 차량이 아닙니다.",
                             ["ResultType"] = Convert.ToInt32(DisCountResultType.NotFound)
                         };
                     }
@@ -477,8 +495,9 @@ namespace ParkingHelp.ParkingDiscountBot
         /// <param name="carNum">차량번호</param>
         /// <param name="page">브라우저 객체</param>
         /// <param name="jobReturn">결과를 전송받은 JObject</param>
+        /// <param name="isGetOffWork">현재 퇴근 여부(현재시간 계산 or 퇴근시간 기준)</param>
         /// <returns>jobReturn</returns>
-        private static async Task<JObject> ApplyDiscount(int feeValue, string carNum, IPage page, JObject jobReturn, bool isGetOffWork = true)
+        private static async Task<JObject> ApplyDiscount(int feeValue, string carNum, IPage page, JObject jobReturn, bool isGetOffWork = false)
         {
             var now = DateTime.Now;
             var today = now.DayOfWeek;
@@ -496,7 +515,7 @@ namespace ParkingHelp.ParkingDiscountBot
             string feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync(); 
             int feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", "")); //현재 주차요금 및 적용 이후 반영할 금액
 
-            IReadOnlyList<IElementHandle> cancelButtons = await GetBasicParkingDisCountTicket(page); //적용한 방문자 할인권을 취소하는 버튼
+            IReadOnlyList<IElementHandle> cancelButtons = await GetBasicParkingDisCountTicket(page); //적용한 방문자 할인권을 취소하는 버튼 취득
             //방문자 할인권을 찾았고 취소버튼이 2개 미만인 경우에만 할인권 적용 
             if (await discountButton.IsVisibleAsync() && cancelButtons.Count == 0) //방문자 할인권 적용 안함
             {
@@ -549,7 +568,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 if (input != null)
                 {
                     string parkingTimeText = await input!.GetAttributeAsync("value") ?? "";
-                    totalParkingMinute = GetTotalParkingMinutes(parkingTimeText);
+                    totalParkingMinute = GetTotalParkingMinutes(parkingTimeText, isGetOffWork);
                 }
 
                 if(totalParkingMinute != -1)
@@ -561,7 +580,7 @@ namespace ParkingHelp.ParkingDiscountBot
                     //전체 할인받은 금액을 시간으로 환산
                     double discountedMinutesRaw = (totalDiscountedFee / ParkingDiscountManager.FEE_PER_TIME_BLOCK) * ParkingDiscountManager.TIME_BLOCK_MINUTES; 
                     int totalDiscountedMinutes = (int)Math.Ceiling(discountedMinutesRaw);
-                    ParkingDiscountPlan discountPlan = ApplyDiscountTicketsWithInventory(feeValueAfter, totalParkingMinute, totalDiscountedMinutes, discountInventory, 15);
+                    ParkingDiscountPlan discountPlan = ApplyDiscountTicketsWithInventory(feeValueAfter, totalParkingMinute, totalDiscountedMinutes, discountInventory, BUFFER_OUT_TIME_MINUTES);
                     if(discountPlan.Use30Min > 0)
                     {
                         discountButton = page.Locator("#add-discount-2"); //30분 할인권버튼
@@ -616,8 +635,8 @@ namespace ParkingHelp.ParkingDiscountBot
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="inputMsg"></param>
-        /// <param name="isGetOffWork"></param>
+        /// <param name="inputMsg">주차시간(0일 7시 5분) </param>
+        /// <param name="isGetOffWork">퇴근여부 True = 퇴근 False = 배치 동작시간</param>
         /// <returns></returns>
         private static int GetTotalParkingMinutes(string inputMsg, bool isGetOffWork = false )
         {
@@ -650,6 +669,8 @@ namespace ParkingHelp.ParkingDiscountBot
                 TimeOnly now = TimeOnly.FromDateTime(DateTime.Now);
                 totalMinutes += (int)(GET_OFF_WORK_TIME.ToTimeSpan() - now.ToTimeSpan()).TotalMinutes;
             }
+
+            totalMinutes -= FREE_PARKING_MINUTES; //기본 무료 주차시간
 
             return totalMinutes;
         }
@@ -724,25 +745,23 @@ namespace ParkingHelp.ParkingDiscountBot
         /// 실제 남은 할인권과 주차요금에따라 할인권을 적용하는 함수
         /// </summary>
         /// <param name="realFee">실제 계산할 주차요금</param>
-        /// <param name="totalRealParkingMinutes">전체 주차시간</param>
+        /// <param name="totalRealParkingMinutes">전체 주차시간(최초 30분을 제외한 실제 부과할 요금시간)</param>
         /// <param name="alreadyDiscountedMinutes">이미 사전 할인받은 금액</param>
         /// <param name="inventory">주차권 종류 및 수량</param>
         /// <param name="bufferMinutes">출차 보장 시간</param>
         /// <returns></returns>
         public static ParkingDiscountPlan ApplyDiscountTicketsWithInventory(int realFee, int totalRealParkingMinutes, int alreadyDiscountedMinutes, DiscountInventory inventory, int bufferMinutes = 15)
         {
-            const int feePerBlock = 2000;
-            const int minutesPerBlock = 30;
-
             // 1. 요금 기준 최대 커버 시간
-            int feeBlocks = (int)Math.Ceiling(realFee / (double)feePerBlock);
-            int maxMinutesByFee = feeBlocks * minutesPerBlock;
+            int feeBlocks = (int)Math.Ceiling(realFee / (double)FEE_PER_TIME_BLOCK);
+            int maxMinutesByFee = feeBlocks * TIME_BLOCK_MINUTES;
 
             // 2. 실제 필요한 추가 할인 시간 (실주차 - 기존 할인 + 여유시간)
             int requiredMinutes = Math.Max(0, (totalRealParkingMinutes - alreadyDiscountedMinutes) + bufferMinutes);
 
-            // 3. 실제 할인 적용할 시간 = 요금 기준 한도 vs 실제 필요한 추가 시간 중 작은 값
-            int targetMinutes = Math.Min(requiredMinutes, maxMinutesByFee);
+            // 3. 실제 할인 적용할 시간 = 요금 기준 한도 vs 실제 필요한 추가 시간 중 큰값
+            // 버퍼시간까지 1. 고려한 할인권 적용시 최대 보장시간과 2. 현재 주차  시간을 구한다음 더 큰값을 선택 
+            int targetMinutes = Math.Max(requiredMinutes, maxMinutesByFee);
 
             var result = new ParkingDiscountPlan();
 
@@ -759,6 +778,15 @@ namespace ParkingHelp.ParkingDiscountBot
             result.Use30Min = use30m;
             targetMinutes -= use30m * 30;
 
+            //이후 남은 시간이 15분 이상이고 30분 할인권이 남아있으면 30분 할인권을 추가로 적용
+            if (targetMinutes > 15 && inventory.Count30Min > result.Use30Min) 
+            {
+                result.Use30Min += 1;
+                targetMinutes -= 30;
+                if (targetMinutes < 0)
+                    targetMinutes = 0;
+            }
+            //3.에서 선택하고 남은 잔여시간
             result.UncoveredMinutes = targetMinutes;
 
             return result;
@@ -816,9 +844,48 @@ namespace ParkingHelp.ParkingDiscountBot
         }
         private static async Task RestartBrowserAsync()
         {
+            try { await _context?.CloseAsync(); } catch { }
             try { await _browser?.CloseAsync(); } catch { }
-            _browser = await _playwright.Chromium.LaunchAsync(new() { Headless = true });
-            _context = await _browser.NewContextAsync();
+
+            _browser = await _playwright.Chromium.LaunchAsync(new()
+            {
+                Headless = true,
+                Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
+            });
+
+            if (File.Exists(ParkingDiscountManager.SessionFilePath))
+            {
+                _context = await _browser.NewContextAsync(new()
+                {
+                    StorageStatePath = ParkingDiscountManager.SessionFilePath,
+                    IgnoreHTTPSErrors = true,
+                    ViewportSize = null,
+                    BypassCSP = true
+                });
+            }
+            else
+            {
+                var tempContext = await _browser.NewContextAsync();
+                var page = await tempContext.NewPageAsync();
+
+                await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new() { WaitUntil = WaitUntilState.NetworkIdle });
+                await page.FillAsync("#id", "C2115");
+                await page.FillAsync("#password", "6636");
+                await page.ClickAsync("#loginBtn");
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+                string storageStateJson = await tempContext.StorageStateAsync();
+                await File.WriteAllTextAsync(ParkingDiscountManager.SessionFilePath, storageStateJson);
+                await tempContext.CloseAsync();
+
+                _context = await _browser.NewContextAsync(new()
+                {
+                    StorageStatePath = ParkingDiscountManager.SessionFilePath,
+                    IgnoreHTTPSErrors = true,
+                    ViewportSize = null,
+                    BypassCSP = true
+                });
+            }
         }
 
     }
