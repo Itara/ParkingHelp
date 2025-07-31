@@ -180,6 +180,7 @@ namespace ParkingHelp.Controllers
                         Status = offer.Status,
                         DiscountTotalCount = offer.DiscountTotalCount,
                         DiscountApplyCount = offer.DiscountApplyCount,
+                        HelpOfferType = offer.HelpOfferType,
                         HelperServiceDate = offer.HelerServiceDate,
                         Helper = new HelpMemberDto
                         {

@@ -12,6 +12,7 @@ namespace ParkingHelp.DTO
         public DateTimeOffset? HelperServiceDate { get; set; }
         public int DiscountTotalCount { get; set; }
         public int? DiscountApplyCount { get; set; }
+        public HelpOfferType HelpOfferType { get; set; }
         public List<HelpOfferDetailDTO>? HelpOfferDetail { get; set; }
         public string? SlackThreadTs { get; set; } = null!;
     }
@@ -38,6 +39,4 @@ namespace ParkingHelp.DTO
         public DiscountApplyType DiscountApplyType { get; set; }
         public DateTimeOffset? RequestDate { get; set; }
     }
-
-
 }
