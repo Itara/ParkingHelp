@@ -179,7 +179,6 @@ namespace ParkingHelp.ParkingDiscountBot
                     }
                     if (_ParkingDiscountPriorityQueue.Count == 0)
                     {
-                        Console.WriteLine("Queue Count 0....");
                         await Task.Delay(500);
                         continue;
                     }

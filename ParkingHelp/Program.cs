@@ -8,6 +8,7 @@ using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.ParkingDiscountBot;
 using ParkingHelp.SlackBot;
+using ParkingHelp.WebSockets;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization; // DbContext 네임스페이스
@@ -92,9 +93,18 @@ app.UseSwaggerUI(c =>
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "ParkingHelp v1");
     c.RoutePrefix = "swagger";
 });
-
 app.UseAuthorization();
+app.UseWebSockets(new WebSocketOptions
+{
+    KeepAliveInterval = TimeSpan.FromSeconds(60), // Ping 없이도 기본 연결 유지
+});
+
+var wsHandler = new WebSocketHandler();
+app.Map("/ws", wsHandler.HandleAsync);
+
 app.MapControllers();
+
+_ = Task.Run(() => ParkingHelp.WebSockets.WebSocketManager.StartPingLoopAsync()); 
 
 // log4net 설정
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());

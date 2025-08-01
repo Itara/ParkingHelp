@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>WebSocket Demo</title>
+</head>
+<body>
+  <h2>WebSocket 테스트 클라이언트</h2>
+
+  <label>userId: <input type="text" id="userId" value="user123"></label>
+  <button onclick="connect()">Connect</button><br><br>
+
+  <textarea id="log" rows="10" cols="80" readonly></textarea><br><br>
+
+  <textarea id="message" rows="5" cols="80" placeholder='{"type":"ping"}'></textarea><br>
+  <button onclick="sendMessage()">Send</button>
+
+  <script>
+    let socket;
+
+    function log(msg) {
+      const logBox = document.getElementById("log");
+      logBox.value += msg + "\n";
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function connect() {
+      const userId = document.getElementById("userId").value;
+      const wsUrl = `ws://localhost:5000/ws?userId=${userId}`;
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => log("[연결됨] " + wsUrl);
+      socket.onmessage = (event) => log("[수신] " + event.data);
+      socket.onerror = (err) => log("[에러] " + err.message);
+      socket.onclose = () => log("[연결 종료]");
+    }
+
+    function sendMessage() {
+      const msg = document.getElementById("message").value;
+      socket.send(msg);
+      log("[전송] " + msg);
+    }
+  </script>
+</body>
+</html>
