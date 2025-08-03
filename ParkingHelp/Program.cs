@@ -101,9 +101,7 @@ app.UseWebSockets(new WebSocketOptions
 
 var wsHandler = new WebSocketHandler();
 app.Map("/ws", wsHandler.HandleAsync);
-
 app.MapControllers();
-
 _ = Task.Run(() => ParkingHelp.WebSockets.WebSocketManager.StartPingLoopAsync()); 
 
 // log4net 설정

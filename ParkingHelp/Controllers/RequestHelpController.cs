@@ -6,7 +6,9 @@ using Microsoft.CodeAnalysis.Elfie.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics.Internal;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ParkingHelp.Common;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.DTO;
@@ -15,6 +17,7 @@ using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
 using System.Linq;
 using static ParkingHelp.DTO.HelpRequesterDto;
+using WebSocketManager = ParkingHelp.WebSockets.WebSocketManager;
 namespace ParkingHelp.Controllers
 {
 
@@ -28,7 +31,7 @@ namespace ParkingHelp.Controllers
         {
             _context = context;
             _slackNotifier = new SlackNotifier(slackOptions);
-          
+
         }
 
         /// <summary>
@@ -156,7 +159,7 @@ namespace ParkingHelp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                var returnNewReqHelps = await _context.ReqHelps
+                List<ReqHelpDto> returnNewReqHelps = await _context.ReqHelps
                     .Include(r => r.HelpReqMember)
                     .ThenInclude(m => m.Cars)
                     .Include(r => r.HelpDetails)
@@ -192,46 +195,59 @@ namespace ParkingHelp.Controllers
                    .ToListAsync();
 
                 // 요청자 정보 추출
-                string requestName = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.HelpRequesterName ?? "Unknown";
-                string requestEmail = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.RequesterEmail ?? "Unknown Email";
-                string requestSlackId = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.SlackId ?? "Unknown Slack ID";
-                string requestCarNumber = returnNewReqHelps.FirstOrDefault()?.HelpRequester.ReqHelpCar?.CarNumber ?? "Unknown Car Number";
+                #region 이전 슬랙 메세지 전달
+                //string requestName = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.HelpRequesterName ?? "Unknown";
+                //string requestEmail = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.RequesterEmail ?? "Unknown Email";
+                //string requestSlackId = returnNewReqHelps.FirstOrDefault()?.HelpRequester?.SlackId ?? "Unknown Slack ID";
+                //string requestCarNumber = returnNewReqHelps.FirstOrDefault()?.HelpRequester.ReqHelpCar?.CarNumber ?? "Unknown Car Number";
 
-                if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
+                //if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
+                //{
+                //    SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(requestEmail);
+                //    if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
+                //    {
+                //        requestSlackId = slackUser.Id;
+                //    }
+                //}
+                //JObject? resultSlaclSendMessage = null;
+                //if (requestSlackId != "Unknown Slack ID")
+                //{
+                //    // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"<@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                //}
+                //else
+                //{
+                //    // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                //}
+                //if (resultSlaclSendMessage != null && Convert.ToBoolean(resultSlaclSendMessage["ok"])) // 슬랙 메시지 전송 성공시
+                //{
+                //    if (!string.IsNullOrEmpty(resultSlaclSendMessage["ts"]?.ToString()))
+                //    {
+                //        newReqHelp.SlackThreadTs = resultSlaclSendMessage["ts"]?.ToString();
+                //        await _context.SaveChangesAsync();
+                //        ReqHelpDto reqHelpDto = returnNewReqHelps.First();
+                //        reqHelpDto.UpdateSlackThreadTs = newReqHelp.SlackThreadTs;
+                //    }
+                //    return Ok(returnNewReqHelps);
+                //}
+                //else
+                //{
+                //    Console.WriteLine("슬랙 메시지 전송 실패: " + resultSlaclSendMessage?.ToString());
+                //    return Ok(returnNewReqHelps);
+                //} 
+                #endregion
+
+                //WebSocket 전달
+                foreach (ReqHelpDto reqHelpDto in returnNewReqHelps) //신규등록이라 1개밖에 없지만 List배열 처리
                 {
-                    SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(requestEmail);
-                    if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
-                    {
-                        requestSlackId = slackUser.Id;
-                    }
-                }
-                JObject? resultSlaclSendMessage = null;
-                if (requestSlackId != "Unknown Slack ID")
-                {
-                    // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"<@{requestSlackId}>의 주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
-                }
-                else
-                {
-                    // resultSlaclSendMessage = await _slackNotifier.SendMessageAsync($"주차 등록을 도와주세요! 차량번호:{requestCarNumber} ");
+                    int newReqHelpRegistMemberID = reqHelpDto.HelpRequester.Id;
+                    JObject newReqHelpJob = JObject.Parse(JsonConvert.SerializeObject(reqHelpDto));
+                    JObject socketSendJob = GetWebSocketJObject(ProtocolType.ReqHelpRegist, newReqHelpJob);
+                    _ = Task.Run(() => WebSocketManager.SendToUserAsync(newReqHelpRegistMemberID, socketSendJob));
                 }
 
-                if (resultSlaclSendMessage != null && Convert.ToBoolean(resultSlaclSendMessage["ok"])) // 슬랙 메시지 전송 성공시
-                {
-                    if (!string.IsNullOrEmpty(resultSlaclSendMessage["ts"]?.ToString()))
-                    {
-                        newReqHelp.SlackThreadTs = resultSlaclSendMessage["ts"]?.ToString();
-                        await _context.SaveChangesAsync();
-                        ReqHelpDto reqHelpDto = returnNewReqHelps.First();
-                        reqHelpDto.UpdateSlackThreadTs = newReqHelp.SlackThreadTs;
-                    }
-                    return Ok(returnNewReqHelps);
-                }
-                else
-                {
-                    Console.WriteLine("슬랙 메시지 전송 실패: " + resultSlaclSendMessage?.ToString());
-                    return Ok(returnNewReqHelps);
-                }
-                //Azure 서버도 넣어야하고 할께 많은데 시간은 없고 용준아 잘좀하자
+                return Ok(returnNewReqHelps);
+
+
             }
             catch (Exception ex)
             {
@@ -280,7 +296,7 @@ namespace ParkingHelp.Controllers
 
                 await _context.SaveChangesAsync();
 
-                var updateReqHelps = await _context.ReqHelps
+                ReqHelpDto? updateReqHelps = await _context.ReqHelps
                 .Where(r => r.Id == id)
                 .Include(r => r.HelpReqMember)
                 .Include(r => r.ReqCar)
@@ -325,55 +341,32 @@ namespace ParkingHelp.Controllers
                 .FirstOrDefaultAsync();
 
                 // 요청자 정보 추출
-                string requestName = updateReqHelps?.HelpRequester?.HelpRequesterName ?? "Unknown";
-                string requestEmail = updateReqHelps?.HelpRequester?.RequesterEmail ?? "Unknown Email";
-                string requestSlackId = updateReqHelps?.HelpRequester?.SlackId ?? "Unknown Slack ID";
-                string requestCarNumber = updateReqHelps?.HelpRequester.ReqHelpCar?.CarNumber ?? "Unknown Car Number";
+                #region Slack 연동 주석처리
+                //string requestName = updateReqHelps?.HelpRequester?.HelpRequesterName ?? "Unknown";
+                //string requestEmail = updateReqHelps?.HelpRequester?.RequesterEmail ?? "Unknown Email";
+                //string requestSlackId = updateReqHelps?.HelpRequester?.SlackId ?? "Unknown Slack ID";
+                //string requestCarNumber = updateReqHelps?.HelpRequester.ReqHelpCar?.CarNumber ?? "Unknown Car Number";
 
-                if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
+                //if ((string.IsNullOrEmpty(requestSlackId) || requestSlackId == "Unknown Slack ID") && requestEmail != "Unknown Email")
+                //{
+                //    SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(requestEmail);
+                //    if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
+                //    {
+                //        requestSlackId = slackUser.Id;
+                //    }
+                //} 
+                #endregion
+
+                //WebSocket 전달 (요청등록한 사람과 도움 등록한사람들 둘다)
+                List<int> userIdList = new List<int>();
+                if (updateReqHelps != null)
                 {
-                    SlackUserByEmail? slackUser = await _slackNotifier.FindUserByEmailAsync(requestEmail);
-                    if (slackUser != null && !string.IsNullOrEmpty(slackUser.Id))
-                    {
-                        requestSlackId = slackUser.Id;
-                    }
+                    userIdList = GetSendUserIdList(updateReqHelps);
                 }
 
-                //if (query.Status.HasValue)
-                //{
-                //    switch ((CarHelpStatus)query.Status)
-                //    {
-                //        case CarHelpStatus.Completed: //주차등록이 완료 
-                //            if (requestSlackId != "Unknown Slack ID" && helperSlackId != "Unknown Helper Slack ID") //slackID를 둘다 찾은경우
-                //            {
-                //                await _slackNotifier.SendMessageAsync($"<@{helperSlackId}>님이 <@{requestSlackId}> 의 차량({requestCarNumber}) 주차 등록을 완료했습니다! ", reqHelp.SlackThreadTs);
-                //            }
-                //            else if (requestSlackId != "Unknown Slack ID" && helperSlackId == "Unknown Helper Slack ID") //요청자의 SlackID만 존재할경우
-                //            {
-                //                await _slackNotifier.SendMessageAsync($"@channel <@{requestSlackId}>의 차량({requestCarNumber})을 {helperName}님이 주차 등록을 완료했습니다!!", reqHelp.SlackThreadTs);
-                //            }
-                //            else
-                //            {
-                //                await _slackNotifier.SendMessageAsync($"@channel 차량({requestCarNumber})주차등록을 {helperName}님이 주차 등록을 완료했습니다!!", reqHelp.SlackThreadTs);
-                //            }
-                //            break;
-
-                //        case CarHelpStatus.Check:
-                //            if (requestSlackId != "Unknown Slack ID" && helperSlackId != "Unknown Helper Slack ID") //slackID를 둘다 찾은경우
-                //            {
-                //                await _slackNotifier.SendMessageAsync($"<@{requestSlackId}> 의 차량({requestCarNumber})을 <@{helperSlackId}>님이 주차 등록 요청을 확인했어요! ", reqHelp.SlackThreadTs);
-                //            }
-                //            else if (requestSlackId != "Unknown Slack ID" && helperSlackId == "Unknown Helper Slack ID") //요청자의 SlackID만 존재할경우
-                //            {
-                //                await _slackNotifier.SendMessageAsync($"@channel <@{requestSlackId}> 의 차량({requestCarNumber})을 {helperName}님이 주차 등록 요청을 확인했어요!", reqHelp.SlackThreadTs);
-                //            }
-                //            else
-                //            {
-                //                await _slackNotifier.SendMessageAsync($"@channel 차량({requestCarNumber}) 주차등록을 {helperName}님이 주차 등록 요청을 확인했습니다!", reqHelp.SlackThreadTs);
-                //            }
-                //            break;
-                //    }
-                //}
+                JObject updateReqHelpJob = JObject.Parse(JsonConvert.SerializeObject(updateReqHelps));
+                JObject socketSendJob = GetWebSocketJObject(ProtocolType.ReqHelpUpdate, updateReqHelpJob);
+                _ = Task.Run(() => WebSocketManager.SendToUserAsync(userIdList, socketSendJob));
 
                 return Ok(updateReqHelps);
             }
@@ -395,8 +388,66 @@ namespace ParkingHelp.Controllers
 
             try
             {
+
+                ReqHelpDto? deleteReqHelpDto = await _context.ReqHelps
+                 .Where(r => r.Id == id)
+                 .Include(r => r.HelpReqMember)
+                 .Include(r => r.ReqCar)
+                 .Include(r => r.HelpDetails)
+                 .Select(r => new ReqHelpDto
+                 {
+                     Id = r.Id,
+                     ReqDate = r.ReqDate,
+                     Status = r.Status,
+                     ApplyDisCount = r.DiscountApplyCount,
+                     TotalDisCount = r.DiscountTotalCount,
+                     HelpRequester = new HelpRequesterDto
+                     {
+                         Id = r.HelpReqMember.Id,
+                         HelpRequesterName = r.HelpReqMember.MemberName,
+                         RequesterEmail = r.HelpReqMember.Email,
+                         SlackId = r.HelpReqMember.SlackId,
+                         ReqHelpCar = new ReqHelpCarDto
+                         {
+                             Id = r.HelpReqMember.Cars.First().Id,
+                             CarNumber = r.HelpReqMember.Cars.First().CarNumber
+                         }
+                     }
+                    ,
+                     HelpDetails = r.HelpDetails.Select(d => new ReqHelpDetailDto
+                     {
+                         Id = d.Id,
+                         ReqDetailStatus = d.ReqDetailStatus,
+                         DiscountApplyDate = d.DiscountApplyDate,
+                         DiscountApplyType = d.DiscountApplyType,
+                         InsertDate = d.InsertDate,
+                         Helper = d.HelperMember == null ? null : new HelpMemberDto
+                         {
+                             Id = d.HelperMember.Id,
+                             Name = d.HelperMember.MemberName,
+                             Email = d.HelperMember.Email,
+                             SlackId = d.HelperMember.SlackId
+                         },
+                         SlackThreadTs = d.SlackThreadTs
+                     }).ToList()
+                 })
+                 .FirstOrDefaultAsync();
+
                 _context.ReqHelps.Remove(reqHelp);
                 await _context.SaveChangesAsync();
+
+                //WebSocket 전달 (요청등록한 사람과 도움 등록한사람들 둘다)
+                List<int> userIdList = new List<int>();
+                if (deleteReqHelpDto != null)
+                {
+                    userIdList = GetSendUserIdList(deleteReqHelpDto);
+                }
+
+                JObject updateReqHelpJob = JObject.Parse(JsonConvert.SerializeObject(deleteReqHelpDto));
+                JObject socketSendJob = GetWebSocketJObject(ProtocolType.ReqHelpDelete, updateReqHelpJob);
+                _ = Task.Run(() => WebSocketManager.SendToUserAsync(userIdList, socketSendJob));
+                //
+
                 return Ok(reqHelp);
             }
             catch (Exception ex)
@@ -525,6 +576,18 @@ namespace ParkingHelp.Controllers
                    }).ToList()
                })
                .FirstOrDefaultAsync();
+
+                //WebSocket 전달 (요청등록한 사람과 도움 등록한사람들 둘다)
+                List<int> userIdList = new List<int>();
+                if (updateReqHelps != null)
+                {
+                    userIdList =GetSendUserIdList(updateReqHelps);
+                }
+                JObject updateReqHelpJob = JObject.Parse(JsonConvert.SerializeObject(updateReqHelps));
+                JObject socketSendJob = GetWebSocketJObject(ProtocolType.ReqHelpDelete, updateReqHelpJob);
+
+
+                _ = Task.Run(() => WebSocketManager.SendToUserAsync(userIdList, socketSendJob));
                 return Ok(updateReqHelps);
             }
             catch (Exception ex)
@@ -573,11 +636,11 @@ namespace ParkingHelp.Controllers
 
                     int applyCount = _context.ReqHelpsDetail.Where(x => x.Req_Id == updateTarget.Req_Id && x.ReqDetailStatus != ReqDetailStatus.Waiting).Count(); //현재 남아있는 ReqHelpDetail의 개수 중 적용된 개수를 가져옴
                     rephelp.DiscountApplyCount = applyCount;
-                    if(rephelp.DiscountTotalCount == applyCount)
+                    if (rephelp.DiscountTotalCount == applyCount)
                     {
                         rephelp.Status = HelpStatus.Completed; //모든 요청이 완료되면 상태를 Completed로 변경
                     }
-                    else if(applyCount != 0 && applyCount < rephelp.DiscountTotalCount)
+                    else if (applyCount != 0 && applyCount < rephelp.DiscountTotalCount)
                     {
                         rephelp.Status = HelpStatus.Check;
                     }
@@ -589,7 +652,7 @@ namespace ParkingHelp.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                var returnReqHelp = await _context.ReqHelps.Where(r => r.Id == updateTarget.Req_Id)
+                List<ReqHelpDto> returnReqHelps = await _context.ReqHelps.Where(r => r.Id == updateTarget.Req_Id)
                                         .Include(r => r.HelpReqMember)
                                             .ThenInclude(m => m.Cars)
                                         .Include(r => r.HelpDetails)
@@ -629,7 +692,23 @@ namespace ParkingHelp.Controllers
                                             }).ToList()
                                         }).ToListAsync();
 
-                return Ok(returnReqHelp);
+
+                //WebSocket 전달 (요청등록한 사람과 도움 등록한사람들 둘다)
+                List<int> userIdList = new List<int>();
+                foreach(ReqHelpDto reqHelpDto in returnReqHelps)
+                {
+                    if (reqHelpDto != null)
+                    {
+                        List<int> userlists = GetSendUserIdList(reqHelpDto);
+                        userIdList.AddRange(userlists.Where(uid => !userIdList.Contains(uid)));
+                    }
+                    JObject updateReqHelpJob = JObject.Parse(JsonConvert.SerializeObject(reqHelpDto));
+                    JObject socketSendJob = GetWebSocketJObject(ProtocolType.ReqHelpUpdate, updateReqHelpJob);
+                    _ = Task.Run(() => WebSocketManager.SendToUserAsync(userIdList, socketSendJob));
+                }
+            
+
+                return Ok(returnReqHelps);
             }
             catch (Exception ex)
             {
@@ -645,13 +724,21 @@ namespace ParkingHelp.Controllers
             try
             {
                 JObject returnJob = new JObject();
-                var deleteReqHelpDetail = _context.ReqHelpsDetail.Where(x => x.Id == RequestDetailId).FirstOrDefault();
+                var deleteReqHelpDetail = _context.ReqHelpsDetail
+                    .Include(r => r.ReqHelps)
+                    .Include(r => r.HelperMember)
+                    .Where(x => x.Id == RequestDetailId).FirstOrDefault();
                 if (deleteReqHelpDetail == null)
                 {
                     return NotFound(GetErrorJobject($"해당 요청세부 내역(ID: {RequestDetailId})이 존재하지 않습니다.", "").ToString());
                 }
 
                 int reqId = deleteReqHelpDetail.Req_Id;
+                int helperMemberID = 0;
+                if(deleteReqHelpDetail.HelperMember != null)
+                {
+                    helperMemberID = deleteReqHelpDetail.HelperMember.Id;
+                }
 
                 _context.ReqHelpsDetail.Remove(deleteReqHelpDetail);
 
@@ -688,13 +775,13 @@ namespace ParkingHelp.Controllers
                  .Include(r => r.HelpReqMember).ThenInclude(m => m.Cars)
                  .Include(r => r.HelpDetails).ThenInclude(r => r.HelperMember)
                  .FirstOrDefault();
-             
-                if(latestReqHelp == null)
+
+                if (latestReqHelp == null)
                 {
                     return Ok();
                 }
 
-                var returnReqHelp = new ReqHelpDto
+                ReqHelpDto returnReqHelp = new ReqHelpDto
                 {
                     Id = latestReqHelp.Id,
                     ReqDate = latestReqHelp.ReqDate,
@@ -731,6 +818,13 @@ namespace ParkingHelp.Controllers
                         }
                     }).ToList()
                 };
+
+                //WebSocket 전달 (요청등록한 사람과 도움 등록한사람들 둘다)
+                
+                JObject updateReqHelpJob = JObject.Parse(JsonConvert.SerializeObject(returnReqHelp));
+                JObject socketSendJob = GetWebSocketJObject(ProtocolType.ReqHelpDetailDelete, updateReqHelpJob);
+                _ = Task.Run(() => WebSocketManager.SendToUserAsync(helperMemberID, socketSendJob));
+
                 return Ok(returnReqHelp);
 
             }
@@ -740,6 +834,32 @@ namespace ParkingHelp.Controllers
                 return BadRequest(jResult.ToString());
             }
         }
+
+        [NonAction]
+        private List<int> GetSendUserIdList(ReqHelpDto reqHelpDto)
+        {
+            List<int> sendUserIdList = new List<int>();
+            sendUserIdList.Add(reqHelpDto.HelpRequester.Id);
+            foreach(ReqHelpDetailDto reqHelpDetailDto in reqHelpDto.HelpDetails)
+            {
+                if(reqHelpDetailDto.Helper != null)
+                {
+                    sendUserIdList.Add(reqHelpDetailDto.Helper.Id);
+                }
+            }
+
+            return sendUserIdList;
+        }
+
+        [NonAction]
+        private JObject GetWebSocketJObject(ProtocolType protocolType, JObject sendJob)
+        {
+            JObject returnJob = new JObject();
+            returnJob.Add("type", EnumExtensions.GetDescription(protocolType));
+            returnJob.Add("payload", sendJob);
+            return returnJob;
+        }
+        [NonAction]
         private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
         {
             return new JObject

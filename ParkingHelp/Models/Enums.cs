@@ -1,4 +1,5 @@
-﻿using System.Runtime.Serialization;
+﻿using System.ComponentModel;
+using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
 namespace ParkingHelp.Models
@@ -67,5 +68,23 @@ namespace ParkingHelp.Models
         OfferOnly = 0, // 제안 등록만
         ImmediateComplete = 1 // 제안 등록과 완료를 동시에 처리
     }
-
+    public enum ProtocolType
+    {
+        [Description("Ping")]
+        Ping = 0,
+        [Description("HelpOfferRegist")]
+        HelpOfferRegist,
+        [Description("HelpOfferUpdate")]
+        HelpOfferUpdate,
+        [Description("HelpOfferDelete")]
+        HelpOfferDelete,
+        [Description("ReqHelpRegist")]
+        ReqHelpRegist,
+        [Description("ReqHelpUpdate")]
+        ReqHelpUpdate,
+        [Description("ReqHelpDelete")]
+        ReqHelpDelete,
+        [Description("ReqHelpDetailDelete")]
+        ReqHelpDetailDelete,
+    }
 }

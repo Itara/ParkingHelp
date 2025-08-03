@@ -21,20 +21,24 @@ namespace ParkingHelp.WebSockets
                 ["HelpOfferDelete"] = ProcessHelpOfferDelete,
                 ["ReqHelpRegist"] = ProcessRequestHelpNewRegist,
                 ["ReqHelpUpdate"] = ProcessRequestHelpUpdate,
-                ["ReqHelpDelete"] = ProcessRequestHelpDelete
+                ["ReqHelpDelete"] = ProcessRequestHelpDelete,
+                ["ReqHelpDetailDelete"] = ProcessRequestHelpDetailDelete
             };
         }
 
         public async Task HandleAsync(HttpContext context)
         {
             // 쿼리에서 userId 받기
-            var userId = context.Request.Query["userId"].ToString();
-            if (string.IsNullOrWhiteSpace(userId))
+            int userId = 0;
+            string getQueryUserID = context.Request.Query["userId"].ToString();
+
+            if (string.IsNullOrWhiteSpace(getQueryUserID))
             {
                 context.Response.StatusCode = 400;
                 await context.Response.WriteAsync("Missing userId");
                 return;
             }
+            userId = Convert.ToInt32(getQueryUserID);
             // 웹소켓 연결 수락
             WebSocket socket = await context.WebSockets.AcceptWebSocketAsync();
             WebSocketManager.AddUser(userId, socket);
@@ -138,6 +142,11 @@ namespace ParkingHelp.WebSockets
             return returnJOb;
         }
         public async Task<JObject> ProcessRequestHelpDelete()
+        {
+            JObject returnJOb = new JObject();
+            return returnJOb;
+        }
+        public async Task<JObject> ProcessRequestHelpDetailDelete()
         {
             JObject returnJOb = new JObject();
             return returnJOb;

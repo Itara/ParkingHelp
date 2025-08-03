@@ -8,10 +8,10 @@ namespace ParkingHelp.WebSockets
 {
     public static class WebSocketManager
     {
-        private static readonly ConcurrentDictionary<string, WebSocketUser> _users = new();
+        private static readonly ConcurrentDictionary<int, WebSocketUser> _users = new();
         private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(30);
 
-        public static void AddUser(string userId, WebSocket socket)
+        public static void AddUser(int userId, WebSocket socket)
         {
             _users[userId] = new WebSocketUser
             {
@@ -22,7 +22,7 @@ namespace ParkingHelp.WebSockets
             Console.WriteLine($"[접속] {userId}");
         }
 
-        public static void RemoveUser(string userId)
+        public static void RemoveUser(int userId)
         {
             if (_users.TryRemove(userId, out _))
             {
@@ -30,12 +30,12 @@ namespace ParkingHelp.WebSockets
             }
         }
 
-        public static WebSocket? GetSocket(string userId)
+        public static WebSocket? GetSocket(int userId)
         {
             return _users.TryGetValue(userId, out var user) ? user.Socket : null;
         }
 
-        public static List<string> GetConnectedUserIds()
+        public static List<int> GetConnectedUserIds()
         {
             return _users.Keys.ToList();
         }
@@ -45,7 +45,7 @@ namespace ParkingHelp.WebSockets
             return _users.Values;
         }
 
-        public static async Task<bool> SendToUserAsync(string userId, JObject sendClientMsg)
+        public static async Task<bool> SendToUserAsync(int userId, JObject sendClientMsg)
         {
             if (_users.TryGetValue(userId, out var user) && user.Socket.State == WebSocketState.Open)
             {
@@ -64,15 +64,49 @@ namespace ParkingHelp.WebSockets
                 catch (WebSocketException ex)
                 {
                     Console.WriteLine($"[{userId}] 전송 실패: {ex.Message}");
-                    RemoveUser(userId); // 정리
+                    RemoveUser(userId); //접속오류날경우 사용자 리스트에서 제거
                 }
             }
-            else if(user.Socket.State != WebSocketState.Open)
+            else if (user != null && user.Socket.State != WebSocketState.Open)
             {
                 RemoveUser(userId); // 정리
             }
+            return false;
+        }
 
-                return false;
+        public static async Task<bool> SendToUserAsync(List<int> userIds, JObject sendClientMsg)
+        {
+            bool bResult = false;
+            foreach(int userId in userIds)
+            {
+                if (_users.TryGetValue(userId, out var user) && user.Socket.State == WebSocketState.Open)
+                {
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(sendClientMsg);
+                    var bytes = Encoding.UTF8.GetBytes(json);
+
+                    try
+                    {
+                        await user.Socket.SendAsync(
+                            new ArraySegment<byte>(bytes),
+                            WebSocketMessageType.Text,
+                            true,
+                            CancellationToken.None);
+                        bResult = true;
+                    }
+                    catch (WebSocketException ex)
+                    {
+                        Console.WriteLine($"[{userId}] 전송 실패: {ex.Message}");
+                        RemoveUser(userId); //접속오류날경우 사용자 리스트에서 제거
+                        bResult =false;
+                    }
+                }
+                else if (user != null && user.Socket.State != WebSocketState.Open)
+                {
+                    RemoveUser(userId); // 정리
+                    bResult = false;
+                }
+            }
+            return bResult;
         }
 
         public static async Task StartPingLoopAsync()

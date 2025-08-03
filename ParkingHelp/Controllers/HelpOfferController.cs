@@ -1,13 +1,17 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ParkingHelp.Common;
 using ParkingHelp.DB;
 using ParkingHelp.DB.QueryCondition;
 using ParkingHelp.DTO;
 using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.SlackBot;
+using ParkingHelp.WebSockets;
+using WebSocketManager = ParkingHelp.WebSockets.WebSocketManager;
 
 namespace ParkingHelp.Controllers
 {
@@ -99,7 +103,7 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPost()]
-        public async Task<IActionResult> PostRequestHelp([FromBody] RequestHelpPostParam query)
+        public async Task<IActionResult> PostHelpOffer([FromBody] RequestHelpPostParam query)
         {
             try
             {
@@ -177,8 +181,11 @@ namespace ParkingHelp.Controllers
                         }
                     }).ToList()
                 };
-
-
+                //WebSocket 전달
+                int newHelpOfferAddMemberId = newHelperOfferDto.Helper.Id;
+                JObject newHelpOfferJob = JObject.Parse(JsonConvert.SerializeObject(newHelperOfferDto));
+                JObject socketSendJob = GetWebSocketJObject(ProtocolType.HelpOfferRegist, newHelpOfferJob);
+                _ = Task.Run(() => WebSocketManager.SendToUserAsync(newHelpOfferAddMemberId, socketSendJob));
                 return Ok(newHelperOfferDto);
             }
             catch (Exception ex)
@@ -309,6 +316,20 @@ namespace ParkingHelp.Controllers
                         }).ToList()
                     };
 
+                    //WebSocket 전달 (등록한 사람과 도움요청한사람들 둘다)
+                    List<int> userIdList = new List<int>();
+                    userIdList.Add(updatedDto.Helper.Id); //등록한 사람
+                    foreach(var helpOfferDetail in updatedDto.HelpOfferDetail)
+                    {
+                        if(helpOfferDetail.HelpRequester != null)
+                        {
+                            userIdList.Add(helpOfferDetail.HelpRequester.Id); //도움요청한사람 
+                        }
+                    }
+                    JObject updateHelpOfferJob = JObject.Parse(JsonConvert.SerializeObject(updatedDto));
+                    JObject socketSendJob = GetWebSocketJObject(ProtocolType.HelpOfferUpdate, updateHelpOfferJob);
+                    _ = Task.Run(() => WebSocketManager.SendToUserAsync(userIdList, socketSendJob)); 
+
                     return Ok(updatedDto);
                 }
                 catch
@@ -324,19 +345,77 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteRequestHelp(int id)
+        public async Task<IActionResult> DeleteHelpOffer(int id)
         {
-            var reqHelp = await _context.HelpOffers.FirstOrDefaultAsync(x => x.Id == id);
+            var helpOffer = await _context.HelpOffers
+                    .Include(h => h.HelperMember)
+                    .Include(h => h.HelpDetails)
+                    .ThenInclude(d => d.RequestMember)
+                    .ThenInclude(m => m.Cars).FirstOrDefaultAsync(x => x.Id == id);
 
-            if (reqHelp == null)
+            if (helpOffer == null)
             {
                 return NotFound("요청이 존재하지 않습니다.");
             }
 
             try
             {
-                _context.HelpOffers.Remove(reqHelp);
+                var deleteHelpOfferDto = new HelpOfferDTO
+                {
+                    Id = helpOffer.Id,
+                    Status = helpOffer.Status,
+                    HelperServiceDate = helpOffer.HelerServiceDate,
+                    DiscountTotalCount = helpOffer.DiscountTotalCount,
+                    DiscountApplyCount = helpOffer.DiscountApplyCount,
+                    SlackThreadTs = helpOffer.SlackThreadTs,
+                    Helper = new HelpMemberDto
+                    {
+                        Id = helpOffer.HelperMember.Id,
+                        Name = helpOffer.HelperMember.MemberName,
+                        Email = helpOffer.HelperMember.Email,
+                        SlackId = helpOffer.HelperMember.SlackId
+                    },
+                    HelpOfferDetail = helpOffer.HelpDetails.Select(d => new HelpOfferDetailDTO
+                    {
+                        Id = d.Id,
+                        ReqDetailStatus = d.ReqDetailStatus,
+                        DiscountApplyDate = d.DiscountApplyDate,
+                        DiscountApplyType = d.DiscountApplyType,
+                        RequestDate = d.RequestDate,
+                        HelpRequester = d.RequestMember == null ? null : new HelpRequesterDto
+                        {
+                            Id = d.RequestMember.Id,
+                            HelpRequesterName = d.RequestMember.MemberName,
+                            RequesterEmail = d.RequestMember.Email,
+                            SlackId = d.RequestMember.SlackId,
+                            ReqHelpCar = d.RequestMember.Cars == null ? null :d.RequestMember.Cars.Select(c => new ReqHelpCarDto
+                            {
+                                Id = c.Id,
+                                CarNumber = c.CarNumber
+                            }).FirstOrDefault()
+                        }
+                    }).ToList()
+                }; 
+                
+                List<int> userIdList = new List<int>();
+                userIdList.Add(deleteHelpOfferDto.Helper.Id); //등록한 사람
+                foreach (var helpOfferDetail in deleteHelpOfferDto.HelpOfferDetail)
+                {
+                    if (helpOfferDetail.HelpRequester != null)
+                    {
+                        userIdList.Add(helpOfferDetail.HelpRequester.Id); //도움요청한사람 
+                    }
+                }
+                //DB반영
+                _context.HelpOffers.Remove(helpOffer);
                 await _context.SaveChangesAsync();
+                ////
+               
+                //WebSocket 전달 (등록한 사람과 도움요청한사람들 둘다)
+                JObject deleteHelpOfferJob = JObject.Parse(JsonConvert.SerializeObject(deleteHelpOfferDto)); //이미 삭제되서 의미없지만 전달
+                JObject socketSendJob = GetWebSocketJObject(ProtocolType.HelpOfferDelete, deleteHelpOfferJob);
+                _ = Task.Run(() => WebSocketManager.SendToUserAsync(userIdList, socketSendJob));
+
                 return Ok();
             }
             catch (Exception ex)
@@ -391,6 +470,7 @@ namespace ParkingHelp.Controllers
             }
         }
 
+        [Obsolete("프론트에서 사용안함")]
         [HttpDelete("HelpOfferDetail/{HelpOfferDetailId}")]
         public async Task<IActionResult> DelteRequestHelpDetail(int HelpOfferDetailId)
         {
@@ -463,6 +543,14 @@ namespace ParkingHelp.Controllers
                                               }
                                           }).ToList()
                                       }).ToListAsync();
+
+                
+                    
+                    //JObject deleteHelpOfferJob = JObject.Parse(JsonConvert.SerializeObject(returnHelpOffer)); //이미 삭제되서 의미없지만 전달
+                    //JObject socketSendJob = GetWebSocketJObject(ProtocolType.HelpOfferDelete, deleteHelpOfferJob);
+                    //_ = Task.Run(() => WebSocketManager.SendToUserAsync(userIdList, socketSendJob));
+
+
                     return Ok(returnHelpOffer);
                 }
                 else
@@ -589,15 +677,21 @@ namespace ParkingHelp.Controllers
                         }
                     }).ToList()
                 };
-                
-
-                return Ok(completedDto);
+                return Ok(completedDto); 
             }
             catch (Exception ex)
             {
                 JObject jResult = GetErrorJobject(ex.Message, ex.InnerException?.ToString() ?? "InnerException is Null");
                 return BadRequest(jResult.ToString());
             }
+        }
+        [NonAction]
+        public JObject GetWebSocketJObject(ProtocolType protocolType ,JObject sendJob)
+        {
+            JObject returnJob = new JObject();
+            returnJob.Add("type", EnumExtensions.GetDescription(protocolType));
+            returnJob.Add("payload", sendJob);
+            return returnJob;
         }
 
         private JObject GetErrorJobject(string errorMessage, string InnerExceptionMessage)
