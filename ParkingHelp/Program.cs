@@ -1,9 +1,11 @@
 using log4net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.OpenApi.Models;
 using Microsoft.Playwright;
 using ParkingHelp.DB;
+using ParkingHelp.DTO;
 using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.ParkingDiscountBot;
@@ -102,7 +104,9 @@ app.UseWebSockets(new WebSocketOptions
 var wsHandler = new WebSocketHandler();
 app.Map("/ws", wsHandler.HandleAsync);
 app.MapControllers();
-_ = Task.Run(() => ParkingHelp.WebSockets.WebSocketManager.StartPingLoopAsync()); 
+_ = Task.Run(() => ParkingHelp.WebSockets.WebSocketManager.StartPingLoopAsync());
+
+//builder.Services.AddAutoMapper(typeof(MappingProfile).Assembly);
 
 // log4net 설정
 var logRepository = LogManager.GetRepository(Assembly.GetEntryAssembly());

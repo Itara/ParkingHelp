@@ -33,6 +33,5 @@ namespace ParkingHelp.Models
         public ICollection<HelpOfferModel> HelpOffers { get; set; } = new List<HelpOfferModel>();
         public ICollection<HelpOfferDetailModel> HelpOffersDetail { get; set; } = new List<HelpOfferDetailModel>();
 
-
     }
 }
