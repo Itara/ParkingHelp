@@ -144,7 +144,7 @@ namespace ParkingHelp.ParkingDiscountBot
                     {
                         lastRunTime = new TimeOnly(currentTime.Hour, currentTime.Minute);
                         Console.WriteLine("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
-                        Logs.Info("할인권 적용 시간입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
+                        Logs.Info($"할인권 적용 시간({DateTime.Now.ToString("HH:mm:ss")})입니다. 할인권 등록을위해 사용자 조회 시작합니다.");
                         List<MemberDto> members = GetMemberList();
                         foreach (MemberDto meber in members)
                         {
@@ -197,6 +197,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         // 2. 퇴근 등록을 한 차량 (Medium)
                         // 3. 배치 시간이 되서 작업시간이 된 차량 (Low)
                         _ParkingDiscountPriorityQueue.TryDequeue(out item, out int priority);
+                        Logs.Info("주차등록 Queue Count : " + _ParkingDiscountPriorityQueue.Count);
                     }
 
                     try
@@ -220,6 +221,8 @@ namespace ParkingHelp.ParkingDiscountBot
                         });
                         Console.WriteLine($"작업중 오류 발생 {ex.Message}");
                         Console.WriteLine($"작업중 오류 발생 {ex.StackTrace}");
+                        Logs.Info($"배치 작업중 오류 발생{ex.Message}");
+                        Logs.Info($"배치 오류 StackTrace: {ex.StackTrace}");
                     }
                 }
             });
@@ -312,6 +315,7 @@ namespace ParkingHelp.ParkingDiscountBot
             lock (_lock)
             {
                 Console.WriteLine($"할인권 적용 요청을 받았습니다. 현재 할인권을 적용해야할 List는 총 {_ParkingDiscountPriorityQueue.Count}개 입니다");
+                Logs.Info($"할인권 적용 요청을 받았습니다. 현재 할인권을 적용해야할 List는 총 {_ParkingDiscountPriorityQueue.Count}개 입니다");
                 _ParkingDiscountPriorityQueue.Enqueue((discountModel, jobType, tcs), priority);
             }
             _semaphore.Release();// 큐 사용 완료 → 다음 대기 작업 실행 가능
@@ -571,46 +575,54 @@ namespace ParkingHelp.ParkingDiscountBot
 
                 if(totalParkingMinute != -1)
                 {
-                    DiscountInventory discountInventory = new DiscountInventory();
-                    discountInventory.Count30Min = ticketCount.ContainsKey("discount30Min") ? ticketCount["discount30Min"] : 0;
-                    discountInventory.Count1Hour = ticketCount.ContainsKey("discount1Hour") ? ticketCount["discount1Hour"] : 0;
-                    discountInventory.Count4Hour = ticketCount.ContainsKey("discount4Hour") ? ticketCount["discount4Hour"] : 0;
-                    //전체 할인받은 금액을 시간으로 환산
-                    double discountedMinutesRaw = (totalDiscountedFee / ParkingDiscountManager.FEE_PER_TIME_BLOCK) * ParkingDiscountManager.TIME_BLOCK_MINUTES; 
-                    int totalDiscountedMinutes = (int)Math.Ceiling(discountedMinutesRaw);
-                    ParkingDiscountPlan discountPlan = ApplyDiscountTicketsWithInventory(feeValueAfter, totalParkingMinute, totalDiscountedMinutes, discountInventory, BUFFER_OUT_TIME_MINUTES);
-                    if(discountPlan.Use30Min > 0)
+                    try
                     {
-                        discountButton = page.Locator("#add-discount-2"); //30분 할인권버튼
-                        for(int i=0;i< discountPlan.Use30Min; i++)
+                        DiscountInventory discountInventory = new DiscountInventory();
+                        discountInventory.Count30Min = ticketCount.ContainsKey("discount30Min") ? ticketCount["discount30Min"] : 0;
+                        discountInventory.Count1Hour = ticketCount.ContainsKey("discount1Hour") ? ticketCount["discount1Hour"] : 0;
+                        discountInventory.Count4Hour = ticketCount.ContainsKey("discount4Hour") ? ticketCount["discount4Hour"] : 0;
+                        //전체 할인받은 금액을 시간으로 환산
+                        double discountedMinutesRaw = (totalDiscountedFee / ParkingDiscountManager.FEE_PER_TIME_BLOCK) * ParkingDiscountManager.TIME_BLOCK_MINUTES;
+                        int totalDiscountedMinutes = (int)Math.Ceiling(discountedMinutesRaw);
+                        ParkingDiscountPlan discountPlan = ApplyDiscountTicketsWithInventory(feeValueAfter, totalParkingMinute, totalDiscountedMinutes, discountInventory, BUFFER_OUT_TIME_MINUTES);
+                        if (discountPlan.Use30Min > 0)
                         {
-                            string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
-                            // 금액 다시 확인
-                            feeValueAfter = await GetRealParkingFee(page);
-                            Console.WriteLine($"Use30Min : {i + 1}번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                            discountButton = page.Locator("#add-discount-2"); //30분 할인권버튼
+                            for (int i = 0; i < discountPlan.Use30Min; i++)
+                            {
+                                string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
+                                // 금액 다시 확인
+                                feeValueAfter = await GetRealParkingFee(page);
+                                Console.WriteLine($"Use30Min : {i + 1}번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                            }
+                        }
+                        if (discountPlan.Use1Hour > 0)
+                        {
+                            discountButton = page.Locator("#add-discount-3"); //1시간 할인권버튼
+                            for (int i = 0; i < discountPlan.Use1Hour; i++)
+                            {
+                                string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
+                                // 금액 다시 확인
+                                feeValueAfter = await GetRealParkingFee(page);
+                                Console.WriteLine($"Use30Min : {i + 1}번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                            }
+                        }
+                        if (discountPlan.Use4Hour > 0)
+                        {
+                            discountButton = page.Locator("#add-discount-4"); //4시간 할인권버튼
+                            for (int i = 0; i < discountPlan.Use4Hour; i++)
+                            {
+                                string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
+                                // 금액 다시 확인
+                                feeValueAfter = await GetRealParkingFee(page);
+                                Console.WriteLine($"Use30Min : {i + 1}번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                            }
                         }
                     }
-                    if (discountPlan.Use1Hour > 0)
+                    catch (Exception ex)
                     {
-                        discountButton = page.Locator("#add-discount-3"); //1시간 할인권버튼
-                        for (int i = 0; i < discountPlan.Use1Hour; i++)
-                        {
-                            string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
-                            // 금액 다시 확인
-                            feeValueAfter = await GetRealParkingFee(page);
-                            Console.WriteLine($"Use30Min : {i + 1}번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
-                        }
-                    }
-                    if (discountPlan.Use4Hour > 0)
-                    {
-                        discountButton = page.Locator("#add-discount-4"); //4시간 할인권버튼
-                        for (int i = 0; i < discountPlan.Use4Hour; i++)
-                        {
-                            string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
-                            // 금액 다시 확인
-                            feeValueAfter = await GetRealParkingFee(page);
-                            Console.WriteLine($"Use30Min : {i + 1}번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
-                        }
+                        Logs.Info($"유료 할인권 적용 중 오류 발생 {ex.Message}");
+                        Logs.Info($"유료 할인권 적용 중 오류 발생 {ex.ToString()}");
                     }
                 }
                 if(feeValueAfter == 0)
@@ -669,6 +681,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 TimeOnly now = TimeOnly.FromDateTime(DateTime.Now);
                 totalMinutes += (int)(GET_OFF_WORK_TIME.ToTimeSpan() - now.ToTimeSpan()).TotalMinutes;
                 Console.WriteLine($"현재시간 {DateTime.Now.ToString("HH:mm:ss")}입니다 출차시간을 {GET_OFF_WORK_TIME.ToString("HH:mm:ss")}기준으로 하여 출차시간을 {totalMinutes}분으로 계산하여 진행합니다");
+                Logs.Info($"현재시간 {DateTime.Now.ToString("HH:mm:ss")}입니다 출차시간을 {GET_OFF_WORK_TIME.ToString("HH:mm:ss")}기준으로 하여 출차시간을 {totalMinutes}분으로 계산하여 진행합니다");
             }
 
             totalMinutes -= FREE_PARKING_MINUTES; //기본 무료 주차시간
