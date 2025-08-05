@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using ParkingHelp.Logging;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -53,7 +54,7 @@ namespace ParkingHelp.WebSockets
 
                     if (result.Count > buffer.Length)
                     {
-                        Console.WriteLine($"[{userId}] 너무 큰 메시지, 연결 종료");
+                        Logs.Info($"[{userId}] 너무 큰 메시지, 연결 종료");
                         await socket.CloseAsync(WebSocketCloseStatus.MessageTooBig, "Message too large", CancellationToken.None);
                         WebSocketManager.RemoveUser(userId);
                         return;
@@ -62,7 +63,7 @@ namespace ParkingHelp.WebSockets
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
                         string? message = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        Console.WriteLine($"[{userId}] 메시지 수신: {message}");
+                        Logs.Info($"[{userId}] 메시지 수신: {message}");
 
                         try
                         {
@@ -83,14 +84,14 @@ namespace ParkingHelp.WebSockets
                                 }
                                 else
                                 {
-                                    Console.WriteLine($"[경고] 알 수 없는 protocol: {protocol}");
+                                    Logs.Info($"[경고] 알 수 없는 protocol: {protocol}");
                                 }
                             }
 
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"[오류] JSON 파싱 실패: {ex.Message}");
+                            Logs.Error($"[오류] JSON 파싱 실패: {ex.Message}",ex);
                         }
                     }
                     else if (result.MessageType == WebSocketMessageType.Close)
@@ -103,7 +104,7 @@ namespace ParkingHelp.WebSockets
             {
                 WebSocketManager.RemoveUser(userId);
                 await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Connection closed", CancellationToken.None);
-                Console.WriteLine($"[{userId}] 연결 종료");
+                Logs.Info($"[{userId}] 연결 종료");
             }
         }
 

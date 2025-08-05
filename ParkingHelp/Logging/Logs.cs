@@ -73,10 +73,31 @@ namespace ParkingHelp.Logging
         }
 
         // 5. 호출 메서드
-        public static void Info(string message) => GetCallerLogger().Info(message);
-        public static void Debug(string message) => GetCallerLogger().Debug(message);
-        public static void Warn(string message) => GetCallerLogger().Warn(message);
-        public static void Error(string message, Exception ex = null) => GetCallerLogger().Error(message, ex);
+        public static void Info(string message)
+        {
+            Console.WriteLine("[INFO] " + message);
+            GetCallerLogger().Info(message);
+        }
+        public static void Debug(string message)
+        {
+            Console.WriteLine("[DEBUG] " + message);
+            GetCallerLogger().Debug(message);
+        }
+
+        public static void Warn(string message)
+        {
+            Console.WriteLine("[WARN] " + message);
+            GetCallerLogger().Warn(message);
+        }
+
+        public static void Error(string message, Exception ex = null)
+        {
+            Console.WriteLine("[ERROR] " + message);
+            if (ex != null)
+                Console.WriteLine(ex.ToString());
+            GetCallerLogger().Error(message, ex);
+        }
+
     }
 
 }
