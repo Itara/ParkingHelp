@@ -467,6 +467,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 }
                 jobReturn["ReturnMessage"] = "Playwright 예외 발생: " + ex.Message;
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Error);
+                Logs.Info($"RegisterParkingDiscountAsync() Error : {ex.Message}");
             }
             catch (Exception ex)
             {
@@ -617,13 +618,15 @@ namespace ParkingHelp.ParkingDiscountBot
                     jobReturn["Result"] = "OK";
                     jobReturn["ReturnMessage"] = $"차량번호: {carNum} 할인권 적용완료";
                     jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
+                    Logs.Info($"차량번호: {carNum} 할인권 적용완료");
                 }
             }
             else
             {
                 jobReturn["Result"] = "OK";
-                jobReturn["ReturnMessage"] = "할인권 적용완료";
+                jobReturn["ReturnMessage"] = $"{carNum} 기본 할인권 적용완료";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
+                Logs.Info($"차량번호: {carNum} 기본 할인권 적용완료");
             }
 
             return jobReturn;
