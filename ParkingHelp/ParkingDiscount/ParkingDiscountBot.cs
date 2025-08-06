@@ -131,14 +131,17 @@ namespace ParkingHelp.ParkingDiscountBot
                 bool isOnlyFirstRun = true; //즉시 실행이면 한번만 실행한다 
                 string? autoDiscountTime = _config["AutoDiscountTime"];
                 string? familyDayTime = _config["FamilyDayTime"];
-                TimeOnly? lastRunTime = null;
+                DateTime? lastRunTime = null;
 
                 Logs.Info($"자동 할인권 적용 시간 {autoDiscountTime ?? ""}");
                 Logs.Info($"Family Day 적용 시간 {familyDayTime ?? ""}");
                 while (true)
                 {
-                    //배치시작시간
-                    TimeOnly currentTime = TimeOnly.FromDateTime(DateTime.Now);
+                    DateTime currentTime = DateTime.Now;
+                    DateTime currentMinute = new DateTime(currentTime.Year, currentTime.Month, currentTime.Day,
+                                     currentTime.Hour, currentTime.Minute, 0);
+
+                    #region 주차자동등록
                     //즉시 실행 1번만 실행
                     if (_config["AutoDiscountTime"] != null
                         && _config["AutoDiscountTime"].Equals("NOW", StringComparison.CurrentCultureIgnoreCase)
@@ -156,9 +159,9 @@ namespace ParkingHelp.ParkingDiscountBot
                         && TimeOnly.TryParse(familyDayTime, out _AutoDisCountApplyTime)
                         && _AutoDisCountApplyTime.Hour == currentTime.Hour
                         && _AutoDisCountApplyTime.Minute == currentTime.Minute
-                        && (!lastRunTime.HasValue || lastRunTime.Value != currentTime))
+                         && (!lastRunTime.HasValue || lastRunTime.Value != currentMinute))
                     {
-                        lastRunTime = currentTime;
+                        lastRunTime = currentMinute;
                         Logs.Info($"금요일 FamilyDay 할인권 적용 시간({DateTime.Now:HH:mm:ss})입니다.");
                         List<MemberDto> members = GetMemberList();
                         if (members.Count == 0)
@@ -175,9 +178,9 @@ namespace ParkingHelp.ParkingDiscountBot
                         && TimeOnly.TryParse(autoDiscountTime, out _AutoDisCountApplyTime)
                         && _AutoDisCountApplyTime.Hour == currentTime.Hour
                         && _AutoDisCountApplyTime.Minute == currentTime.Minute
-                        && (!lastRunTime.HasValue || lastRunTime.Value != currentTime))
+                        && (!lastRunTime.HasValue || lastRunTime.Value != currentMinute))
                     {
-                        lastRunTime = currentTime;
+                        lastRunTime = currentMinute;
                         Logs.Info($"일반 할인권 적용 시간({DateTime.Now:HH:mm:ss})입니다.");
                         List<MemberDto> members = GetMemberList();
                         if (members.Count == 0)
@@ -189,6 +192,7 @@ namespace ParkingHelp.ParkingDiscountBot
                         }
                         ApplyDiscountToMembers(members);
                     }
+                    #endregion
 
                     if (_ParkingDiscountPriorityQueue.Count == 0)
                     {
@@ -199,9 +203,9 @@ namespace ParkingHelp.ParkingDiscountBot
                     //큐 동기화 설정
                     await _semaphore.WaitAsync();
 
-                    (ParkingDiscountModel ParkingDisCountModel, DiscountJobType jobType, TaskCompletionSource<JObject> tcs) item;
+                    (ParkingDiscountModel ParkingDisCountModel, DiscountJobType jobType, TaskCompletionSource<JObject> tcs) item; 
 
-                    //Lock을 사용하여 작업 큐에서 항목을 안전하게 가져옴
+                    //Lock을 사용하여 작업 큐 동기화
                     lock (_lock)
                     {
                         //PriorityQueue로 생성해서 우선순위가 높은것부터 뽑아옴
@@ -238,7 +242,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 }
             });
         }
-
+       
         private static void ApplyDiscountToMembers(List<MemberDto> members)
         {
             foreach (var member in members)
