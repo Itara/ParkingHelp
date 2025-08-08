@@ -363,3 +363,5 @@ MigrationBackup/
 FodyWeavers.xsd
 /ParkingHelp/DB.json
 /ParkingHelp/Setting.json
+# Windows Explorer 설정 파일 무시
+desktop.ini

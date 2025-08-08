@@ -380,9 +380,22 @@ namespace ParkingHelp.ParkingDiscountBot
             {
                 WaitUntil = WaitUntilState.NetworkIdle
             });
+            page = await LoginDiscountPage(page);
             var result = await RegisterParkingDiscountAsync(carNumber, page, isGetOffWork);
             await page.CloseAsync();
             return result;
+        }
+
+        private static async Task<IPage?> LoginDiscountPage(IPage? page)
+        {
+            if (page.Url.Contains("login"))
+            {
+                await page.FillAsync("#id", "C2115");
+                await page.FillAsync("#password", "6636");
+                await page.ClickAsync("#loginBtn");
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            }
+            return page;
         }
         private static async Task<JObject> CheckParkingFeeOnlyAsync(string carNumber, IPage page)
         {
