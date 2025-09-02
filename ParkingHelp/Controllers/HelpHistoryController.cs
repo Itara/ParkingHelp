@@ -28,16 +28,24 @@ namespace ParkingHelp.Controllers
                 DateTimeOffset endOfToday = startOfToday.AddDays(1).AddSeconds(-1); // 현재 날짜의 끝
                 DateTimeOffset from = param.FromHelpDate ?? startOfToday;
                 DateTimeOffset to = param.ToHelpDate ?? endOfToday;
-                List<ReqHelpDto> helpListFromReqHelp = await GetHelpListFromReqHelp(param.HelperMemId, from, to);
-                List<HelpOfferDTO> helpListFromHelpOffer = await GetHelpListFromHelpOffer(param.HelperMemId, from, to);
-                HelpHistoryDTO helpHistoryDTO = new HelpHistoryDTO
+
+                var histories = await _context.HelpHistories
+                .Include(h => h.HelperMember)
+                .Include(h => h.ReceiveMember)
+                .Select(h => new HelpHistoryDTO
                 {
-                    ReqHelps = helpListFromReqHelp,
-                    HelpOffers = helpListFromHelpOffer
-                };
-                helpHistoryDTO.HelperMemId = param.HelperMemId;
-                helpHistoryDTO.TotalCount = helpListFromReqHelp.Count + helpListFromHelpOffer.Count;
-                return Ok(helpHistoryDTO);
+                    Id = h.Id,
+                    HelpType = h.HelpType,
+                    HelperMemberId = h.HelpMemberId,
+                    HelperMemberName = h.HelperMember != null ? h.HelperMember.MemberName : null,
+                    ReceiveHelpMemberId = h.ReceiveHelpMemberId,
+                    ReceiveMemberName = h.ReceiveMember != null ? h.ReceiveMember.MemberName : null,
+                    DiscountApplyType = h.DiscountApplyType,
+                    DetailId = h.DetailId,
+                    HelpCompleteDate = h.HelpCompleteDate
+                })
+                .ToListAsync();
+                return Ok(histories);
             }
             catch (Exception ex)
             {
@@ -45,76 +53,6 @@ namespace ParkingHelp.Controllers
             }
         }
 
-        [NonAction]
-        public async Task<List<ReqHelpDto>> GetHelpListFromReqHelp(int helpMemberId, DateTimeOffset fromDate, DateTimeOffset toDate)
-        {
-            var reqHelpsQuery = _context.ReqHelps
-                .Include(r => r.HelpReqMember)
-                .Include(r => r.HelpDetails)
-                .Include(r => r.ReqCar)
-                .Where(x => x.ReqDate >= fromDate && x.ReqDate <= toDate);
-
-            //reqHelpsQuery = reqHelpsQuery.Where(r => r.Helper != null && r.Helper.Id == helpMemberId && r.Status == Models.CarHelpStatus.Completed);
-            //var reqHelps = await reqHelpsQuery
-            //.Select(r => new ReqHelpDto
-            //{
-            //    Id = r.Id,
-            //    ReqDate = r.ReqDate,
-            //    HelpDate = r.HelpDate,
-            //    Status = r.Status,
-            //    HelpRequester = new HelpRequesterDto
-            //    {
-            //        Id = r.HelpRequester.Id,
-            //        HelpRequesterName = r.HelpRequester.MemberName
-            //    },
-            //    Helper = r.Helper == null ? null : new HelperDto
-            //    {
-            //        Id = r.Helper.Id,
-            //        HelperName = r.Helper.MemberName
-            //    },
-            //    ReqCar = r.ReqCar == null ? null : new ReqHelpCarDto
-            //    {
-            //        Id = r.ReqCar.Id,
-            //        CarNumber = r.ReqCar.CarNumber
-            //    }
-            //})
-            //.ToListAsync();
-            return new List<ReqHelpDto>();
-        }
-        [NonAction]
-        public async Task<List<HelpOfferDTO>> GetHelpListFromHelpOffer(int helpMemberId, DateTimeOffset fromDate, DateTimeOffset toDate)
-        {
-            //var helpOfferQuery = _context.HelpOffers
-            //    .Include(r => r.Requester)
-            //    .Include(r => r.Helper)
-            //    .Include(r => r.ReserveCar)
-            //    .Where(x => x.HelpDate >= fromDate && x.HelpDate <= toDate && x.Status == Models.CarHelpStatus.Completed && x.Helper.Id == helpMemberId);
-
-            //var reqHelps = await helpOfferQuery
-            //.Select(r => new HelpOfferDTO
-            //{
-            //    Id = r.Id,
-            //    HelpDate = r.HelpDate,
-            //    RequestDate = r.ReqDate,
-            //    Status = r.Status,
-            //    Helper = r.Helper == null ? null : new HelperDto
-            //    {
-            //        Id = r.Helper.Id,
-            //        HelperName = r.Helper.MemberName
-            //    },
-            //    HelpRequester = new HelpRequesterDto
-            //    {
-            //        Id = r.Requester!.Id,
-            //        HelpRequesterName = r.Requester.MemberName
-            //    },
-            //    ReqCar = r.ReserveCar == null ? null : new HelpReserveCarDto
-            //    {
-            //        Id = r.ReserveCar.Id,
-            //        CarNumber = r.ReserveCar.CarNumber
-            //    }
-            //})
-            //.ToListAsync();
-            return new List<HelpOfferDTO>();
-        }
+      
     }
 }
