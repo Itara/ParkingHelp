@@ -256,6 +256,8 @@ namespace ParkingHelp.Controllers
                             if (statusChanged && existing.ReqDetailStatus == ReqDetailStatus.Completed)
                             {
                                 existing.DiscountApplyDate = DateTimeOffset.UtcNow;
+                                //도움요청이 완료될때 히스토리 테이블에 Insert
+                                
                             }
                             else if (detail.DiscountApplyDate.HasValue)
                             {

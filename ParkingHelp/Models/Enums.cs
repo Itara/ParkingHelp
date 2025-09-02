@@ -87,4 +87,12 @@ namespace ParkingHelp.Models
         [Description("ReqHelpDetailDelete")]
         ReqHelpDetailDelete,
     }
+
+    public enum HelpHistoryType
+    {
+        [Description("도움요청")]
+        HelpRequest = 0,
+        [Description("도움제공")]
+        HelpOffer = 1,
+    }
 }

@@ -26,7 +26,6 @@ namespace ParkingHelp.Models
         public string? SlackId { get; set; }
 
         public ICollection<MemberCarModel> Cars { get; set; } = new List<MemberCarModel>();
-        
         public ICollection<ReqHelpModel> HelpRequests { get; set; } = new List<ReqHelpModel>();
         public ICollection<ReqHelpDetailModel> ReqHelpDetailHelper { get; set; } = new List<ReqHelpDetailModel>();
 

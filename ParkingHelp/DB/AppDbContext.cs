@@ -13,6 +13,7 @@ namespace ParkingHelp.DB
         public DbSet<HelpOfferModel> HelpOffers { get; set; }
         public DbSet<HelpOfferDetailModel> HelpOffersDetail { get; set; }
         public DbSet<FavoriteMemberModel> FavoriteMembers { get; set; }
+        public DbSet<HelpHistoryModel> HelpHistories { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // DateTimeOffset 컬럼들을 timestamp with time zone으로 강제 매핑
@@ -40,6 +41,8 @@ namespace ParkingHelp.DB
             modelBuilder.Entity<HelpOfferModel>().ToTable("help_offer");
             modelBuilder.Entity<HelpOfferDetailModel>().ToTable("help_offer_detail");
             modelBuilder.Entity<FavoriteMemberModel>().ToTable("member_favorites");
+            modelBuilder.Entity<HelpHistoryModel>().ToTable("help_history");
+
 
             foreach (var entity in modelBuilder.Model.GetEntityTypes())
             {
@@ -99,12 +102,25 @@ namespace ParkingHelp.DB
                 .WithMany(r => r.HelpDetails)
                 .HasForeignKey(d => d.HelpOfferId)
                 .OnDelete(DeleteBehavior.Cascade);
+
             //helpofferdetail ↔ Member (요청자) 
             modelBuilder.Entity<HelpOfferDetailModel>()
                .HasOne(d => d.RequestMember)
                .WithMany(r => r.HelpOffersDetail)
                .HasForeignKey(d => d.RequestMemberId)
                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<HelpHistoryModel>()
+            .HasOne(h => h.HelperMember)
+            .WithMany()
+            .HasForeignKey(h => h.HelpMemberId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<HelpHistoryModel>()
+                .HasOne(h => h.ReceiveMember)
+                .WithMany()
+                .HasForeignKey(h => h.ReceiveHelpMemberId)
+                .OnDelete(DeleteBehavior.SetNull);
 
             // // FavoriteMember ↔ Member (즐겨찾기 하는 회원)
             // modelBuilder.Entity<FavoriteMemberModel>()
