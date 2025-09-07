@@ -14,6 +14,7 @@ using ParkingHelp.WebSockets;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization; // DbContext 네임스페이스
+using ParkingHelp.Services.ParkingDiscount;
 
 var builder = WebApplication.CreateBuilder(args);
 //var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
@@ -82,6 +83,8 @@ builder.Services.AddSwaggerGen(c =>
         c.IncludeXmlComments(xmlPath);
     }
 });
+
+builder.Services.AddScoped<ParkingAutomation>();
 
 var app = builder.Build();
 
