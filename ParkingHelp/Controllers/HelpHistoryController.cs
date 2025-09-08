@@ -53,6 +53,33 @@ namespace ParkingHelp.Controllers
             }
         }
 
-      
+        //[HttpGet()]
+        //public async Task<IActionResult> GetHelpHistoryFromDetail([FromQuery] HelpHistoryGetParam param)
+        //{
+        //    try
+        //    {
+        //        DateTimeOffset startOfToday = DateTimeOffset.UtcNow.Date; // 현재 날짜의 시작
+        //        DateTimeOffset endOfToday = startOfToday.AddDays(1).AddSeconds(-1); // 현재 날짜의 끝
+        //        DateTimeOffset from = param.FromHelpDate ?? startOfToday;
+        //        DateTimeOffset to = param.ToHelpDate ?? endOfToday;
+
+        //        //도움요청(request Deltail)에서 도움내역(HelpHistory) 가져오기
+             
+
+
+        //        //도와줄께요 (help offer)에서 도움내역(HelpHistory) 가져오기
+
+
+        //        return Ok();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return BadRequest(new { Result = "Fail", ErrMsg = ex.Message });
+        //    }
+        //}
+
+
+
+
     }
 }

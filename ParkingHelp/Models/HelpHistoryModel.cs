@@ -19,10 +19,12 @@ namespace ParkingHelp.Models
         public int? ReceiveHelpMemberId { get; set; }
         [Column("help_place_type")]
         public DiscountApplyType DiscountApplyType { get; set; }
-        [Column("help_datail_id")]
+        [Column("help_detail_id")]
         public int DetailId { get; set; }
         [Column("help_complete_date")]
         public DateTimeOffset HelpCompleteDate { get; set; } = DateTimeOffset.UtcNow;
+        [Column("status")]
+        public int? status { get; set; }
         public MemberModel? HelperMember { get; set; }
         public MemberModel? ReceiveMember { get; set; } 
 
