@@ -542,6 +542,56 @@ namespace ParkingHelp.ParkingDiscountBot
             return jobReturn;
         }
 
+
+        /// <summary>
+        /// 적용할 주차 할인권 버튼객체를 가져오는 함수
+        /// </summary>
+        /// <param name="page">브라우져 객체</param>
+        /// <param name="discountMinutes">할인시간(할인권 버튼)</param>
+        /// <returns></returns>
+        private static ILocator? GetDiscountButton(IPage page, int discountMinutes)
+        {
+            //할인시간을 적용할 할인권갯수를 가져온다.
+            ILocator? discountButton = null;
+            switch (discountMinutes)
+            {
+                    case 30:
+                        discountButton = page.Locator("#add-discount-2"); //30분권
+                        break;
+                    case 60:
+                        discountButton = page.Locator("#add-discount-3"); //1시간권
+                        break;
+                    case 240:
+                        discountButton = page.Locator("#add-discount-4"); //4시간권
+                        break;
+            }
+            return discountButton;
+        }
+        /// <summary>
+        /// 할인권적용 (요청받은 유료 할인권만 적용)
+        /// </summary>
+        /// <param name="carNum"></param>
+        /// <param name="discountMinutes">적용할 시간(시간별 할인권이 존재)</param>
+        /// <param name="page"></param>
+        /// <param name="jobReturn"></param>
+        /// <returns></returns>
+        private static async Task<JObject> ApplyDiscount(string carNum,int discountMinutes, IPage page, JObject jobReturn)
+        {
+            
+            ILocator? discountButton = GetDiscountButton(page,discountMinutes);
+            if (discountButton == null)
+            {
+                jobReturn["Result"] = "Fail";
+                jobReturn["ReturnMessage"] = $"{discountMinutes}분권 할인권 버튼을 찾을 수 없습니다.";
+                jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Error);
+                return jobReturn;
+            }
+            
+
+            return jobReturn;
+        }
+
+
         /// <summary>
         /// 할인권 적용
         /// </summary>
@@ -573,24 +623,23 @@ namespace ParkingHelp.ParkingDiscountBot
             //방문자 할인권을 찾았고 취소버튼이 2개 미만인 경우에만 할인권 적용 
             if (await discountButton.IsVisibleAsync() && cancelButtons.Count == 0) //방문자 할인권 적용 안함
             {
-                for(int i = 0; i < 2; i++)
-                {
-                    string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
-                    // 금액 다시 확인
-                    feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
-                    feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
-                    Console.WriteLine($"{i+1}번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
-                    feeValue = feeValueAfter; // 다음 할인권 적용을 위해 현재 금액 업데이트
-                }
-            }
-            else if (await discountButton.IsVisibleAsync() && cancelButtons.Count == 1) //방문자 할인권 1장적용
-            {
+
                 string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
                 // 금액 다시 확인
                 feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
                 feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
-                Console.WriteLine($"첫번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                Console.WriteLine($"기본 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+                feeValue = feeValueAfter; // 다음 할인권 적용을 위해 현재 금액 업데이트
+
             }
+            //else if (await discountButton.IsVisibleAsync() && cancelButtons.Count == 1) //방문자 할인권 1장적용 => 정책변경으로 1장만 가능
+            //{
+            //    string message = await GetMessageFromClickParkingDisCountTicketButton(page, discountButton, feeValue);
+            //    // 금액 다시 확인
+            //    feeValueAfterRaw = await page.Locator("#realFee").InputValueAsync();
+            //    feeValueAfter = int.Parse(Regex.Replace(feeValueAfterRaw, @"[^0-9]", ""));
+            //    Console.WriteLine($"첫번째 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원");
+            //}
             else if (!await discountButton.IsVisibleAsync())  //할인권 버튼을 못찾음
             {
                 Console.WriteLine("방문자주차권 버튼을 찾을 수 없습니다.");
@@ -847,19 +896,25 @@ namespace ParkingHelp.ParkingDiscountBot
             int use1h = Math.Min(targetMinutes / 60, inventory.Count1Hour);
             result.Use1Hour = use1h;
             targetMinutes -= use1h * 60;
+            // 1시간 단위까지 쓰고 남은 시간 확인
+            int remainingAfter1h = targetMinutes % 60;
 
-            int use30m = Math.Min(targetMinutes / 30, inventory.Count30Min);
-            result.Use30Min = use30m;
-            targetMinutes -= use30m * 30;
-
-            //이후 남은 시간이 15분 이상이고 30분 할인권이 남아있으면 30분 할인권을 추가로 적용
-            if (targetMinutes > 15 && inventory.Count30Min > result.Use30Min) 
+            // 만약 31~59분이 남았고, 1시간권 재고가 있으면
+            if (remainingAfter1h > 30 && inventory.Count1Hour > result.Use1Hour)
             {
-                result.Use30Min += 1;
-                targetMinutes -= 30;
-                if (targetMinutes < 0)
-                    targetMinutes = 0;
+                // 30분권 대신 1시간권을 1장 더 사용
+                result.Use1Hour += 1;
+                targetMinutes -= 60;
             }
+            else
+            {
+                // 그 외에는 기존처럼 30분권 적용
+                int use30m = Math.Min(targetMinutes / 30, inventory.Count30Min);
+                result.Use30Min = use30m;
+                targetMinutes -= use30m * 30;
+            }
+
+
             //3.에서 선택하고 남은 잔여시간
             result.UncoveredMinutes = targetMinutes;
 
