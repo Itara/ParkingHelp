@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace ParkingHelp.Models
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum  HelpStatus
+    public enum HelpStatus
     {
         [EnumMember(Value = "Waiting (대기)")]
         Waiting = 0, // 대기
@@ -28,12 +28,12 @@ namespace ParkingHelp.Models
         [EnumMember(Value = "적용안됨")]
         None = 0,
         [EnumMember(Value = "카페")]
-        Cafe = 1 ,
+        Cafe = 1,
         [EnumMember(Value = "식당")]
-        Restaurant = 2, 
+        Restaurant = 2,
     }
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum  RankingOrderType
+    public enum RankingOrderType
     {
         [EnumMember(Value = "Ascending (오름차순)")]
         Ascending = 0, // 오름차순
@@ -51,6 +51,17 @@ namespace ParkingHelp.Models
         Medium = 50, // 퇴근 등록 차량
         Low = 100 // 배치 시간에 맞춰서 할인권 적용
     }
+
+    public enum DiscountTicket
+    {
+        [Description("30분")]
+        Min30 = 30,
+        [Description("1시간")]
+        Hour1 = 60,
+        [Description("4시간")]
+        Hour4 = 240
+    }
+
     public enum DisCountResultType
     {
         Success = 0, // 성공
