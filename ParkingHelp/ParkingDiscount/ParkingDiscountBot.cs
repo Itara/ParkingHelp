@@ -650,8 +650,6 @@ namespace ParkingHelp.ParkingDiscountBot
                                 Logs.Info($"차량번호{carNumber} 추가 유료 할인권 적용 시작");
                                 jobReturn = await ApplyDiscount(feeValue, carNumber, page, jobReturn, isGetOffWork);
                             }
-                            feeValue = await GetRealParkingFee(page);
-                        
                             page = await LogoutDiscountPage(page);
 
                         }
@@ -887,9 +885,10 @@ namespace ParkingHelp.ParkingDiscountBot
             if (discountButton == null)
             {
                 jobReturn["Result"] = "Fail";
-                jobReturn["DiscountType"] = EnumExtensions.GetDescription(discountMinutes);
+                jobReturn["DiscountTicket"] = EnumExtensions.GetDescription(discountMinutes);
                 jobReturn["ReturnMessage"] = $"{EnumExtensions.GetDescription(discountMinutes)}분권 할인권 버튼을 찾을 수 없습니다.";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Error);
+                jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.PaidTicket);
                 return jobReturn;
             }
             try
@@ -900,16 +899,18 @@ namespace ParkingHelp.ParkingDiscountBot
                 // 금액 다시 확인
                 feeValueAfter = await GetRealParkingFee(page);
                 jobReturn["Result"] = "OK";
-                jobReturn["DiscountType"] = EnumExtensions.GetDescription(discountMinutes);
+                jobReturn["DiscountTicket"] = EnumExtensions.GetDescription(discountMinutes);
                 jobReturn["ReturnMessage"] = $"{EnumExtensions.GetDescription(discountMinutes)}할인권 적용완료 남은주차요금 {feeValueAfter}원";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
+                jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.PaidTicket);
             }
             catch (Exception ex)
             {
                 jobReturn["Result"] = "Fail";
-                jobReturn["DiscountType"] = EnumExtensions.GetDescription(discountMinutes);
+                jobReturn["DiscountTicket"] = EnumExtensions.GetDescription(discountMinutes);
                 jobReturn["ReturnMessage"] = $"{EnumExtensions.GetDescription(discountMinutes)}할인권 적용 중 오류 발생 {Environment.NewLine}{ex.Message}";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Error);
+                jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.PaidTicket);
                 return jobReturn;
             }
 
@@ -919,7 +920,7 @@ namespace ParkingHelp.ParkingDiscountBot
 
 
         /// <summary>
-        /// 할인권 적용
+        /// 할인권 적용(기본적용이후 남는 금액은 유료할인권)
         /// </summary>
         /// <param name="feeValue">현재 주차요금</param>
         /// <param name="carNum">차량번호</param>
@@ -1037,6 +1038,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 jobReturn["Result"] = "NoChargeFee";
                 jobReturn["ReturnMessage"] = $"지불할 금액이없습니다.";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
+
             }
             return jobReturn;
         }
