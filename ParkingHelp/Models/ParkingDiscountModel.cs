@@ -14,7 +14,7 @@ namespace ParkingHelp.Models
         /// 할인권 적용 결과를 담을 JObject 초기에는 Null로 설정
         /// </summary>
         public JObject Result { get; set; } = new JObject();
-        public ParkingDiscountModel(string carNumber, string memberEmail, bool isNotifySlack = false ,bool isGetOffWorkTime = true, JObject result = null , bool isUseDiscountTicket = false ,List<DiscountTicket> discountList = null)
+        public ParkingDiscountModel(string carNumber, string memberEmail ,bool isGetOffWorkTime = true, JObject result = null , bool isUseDiscountTicket = false ,List<DiscountTicket> discountList = null)
         {
             CarNumber = carNumber;
             MemberEmail = memberEmail;
@@ -22,7 +22,6 @@ namespace ParkingHelp.Models
             {
                 Result = result;
             }
-            IsNotifySlack = isNotifySlack;
             IsGetOffWorkTime = isGetOffWorkTime;
             IsUseDiscountTicket = isUseDiscountTicket;
             if(discountList != null)

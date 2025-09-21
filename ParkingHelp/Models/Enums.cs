@@ -51,15 +51,29 @@ namespace ParkingHelp.Models
         Medium = 50, // 퇴근 등록 차량
         Low = 100 // 배치 시간에 맞춰서 할인권 적용
     }
-
+    /// <summary>
+    /// 할인권 종류
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum DiscountTicket
     {
+        /// <summary>30분</summary>
         [Description("30분")]
         Min30 = 30,
+        /// <summary>1시간</summary>
         [Description("1시간")]
         Hour1 = 60,
+        /// <summary>4시간</summary>
         [Description("4시간")]
         Hour4 = 240
+    }
+
+    public enum DiscountType
+    {
+        [Description("기본할인권")]
+        BasicTicket = 0,
+        [Description("유료할인권")]
+        PaidTicket = 1
     }
 
     public enum DisCountResultType

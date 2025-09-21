@@ -11,6 +11,7 @@ using ParkingHelp.Models;
 using ParkingHelp.ParkingDiscountBot;
 using ParkingHelp.SlackBot;
 using ParkingHelp.WebSockets;
+using Swashbuckle.AspNetCore.Filters;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json.Serialization; // DbContext 네임스페이스
@@ -73,15 +74,19 @@ builder.Services.AddSwaggerGen(c =>
     });
 
     c.EnableAnnotations();
-    
-    // XML 문서 파일 경로 설정
+
+    // XML 주석
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
     {
         c.IncludeXmlComments(xmlPath);
     }
+
+    c.SchemaFilter<EnumSchemaFilter>();
+    c.ExampleFilters();
 });
+builder.Services.AddSwaggerExamplesFromAssemblyOf<ParkingDiscountFeePostParamExample>();
 
 var app = builder.Build();
 

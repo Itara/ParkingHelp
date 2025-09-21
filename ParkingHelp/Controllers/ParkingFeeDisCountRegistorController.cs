@@ -10,6 +10,7 @@ using ParkingHelp.DTO;
 using ParkingHelp.Models;
 using ParkingHelp.ParkingDiscountBot;
 using ParkingHelp.SlackBot;
+using Swashbuckle.AspNetCore.Filters;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace ParkingHelp.Controllers
@@ -29,6 +30,7 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpPost()]
+        [SwaggerRequestExample(typeof(ParkingDiscountFeePostParam), typeof(ParkingDiscountFeePostParamExample))]
         public async Task<IActionResult> PostDiscountParkingFee([FromBody] ParkingDiscountFeePostParam query)
         {
 
@@ -39,7 +41,7 @@ namespace ParkingHelp.Controllers
                 disCountList = query.DisCountList;
                 isUseDiscountTicket = true;
             }
-            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(query.CarNumber, string.Empty,query.NotifySlackAlarm ?? false , false, null, isUseDiscountTicket, disCountList);
+            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(query.CarNumber, string.Empty, false, null, isUseDiscountTicket, disCountList);
             JObject result = await ParkingDiscountManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.ApplyDiscount, (int)DiscountJobPriority.High);
 
             if (result != null)

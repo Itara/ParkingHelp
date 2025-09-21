@@ -11,6 +11,7 @@ using ParkingHelp.Logging;
 using ParkingHelp.Models;
 using ParkingHelp.ParkingDiscount;
 using ParkingHelp.SlackBot;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
@@ -624,8 +625,8 @@ namespace ParkingHelp.ParkingDiscountBot
                 {
                     //각 계정별로 할인권 적용 시도
                     //요금과 별도로 일단 할인권 적용 시도
-                    //메인계정은 제일 나중에 적용해서 마지막에 불필요한 재 로그인 안하게 적용
-                    //await LoginDiscountPage(mainParkingAccount);
+                    //메인계정은 마지막에 유료할인권 적용하게 가장 후순위로 정렬함.
+              
                     foreach (var parkingAccount in ParkingAccounts)
                     {
                         try
@@ -640,16 +641,8 @@ namespace ParkingHelp.ParkingDiscountBot
                             await page.WaitForSelectorAsync($"a:has-text('{carNumber}')");
                             await page.ClickAsync($"a:has-text('{carNumber}')");
 
-
-                            #region 요금정보 추출하는 부분
-                            var feeElement = page.Locator("#realFee");
-                            // 2. value 추출
-                            string feeValueText = await feeElement.InputValueAsync(); // 예: "0 원"
-                            // 3. 숫자만 추출 (공백, 원 제거)
-                            string numericPart = System.Text.RegularExpressions.Regex.Replace(feeValueText, @"[^0-9]", "");
-                            int feeValue = int.Parse(numericPart); 
-                            #endregion
-
+                            int feeValue = await GetRealParkingFee(page);
+                          
                             jobReturn = await ApplyBasicDiscount(feeValue, carNumber, page, jobReturn, parkingAccount.Id);
                             feeValue =await GetRealParkingFee(page);
                             if (parkingAccount.IsMain && feeValue > 0)
@@ -657,6 +650,8 @@ namespace ParkingHelp.ParkingDiscountBot
                                 Logs.Info($"차량번호{carNumber} 추가 유료 할인권 적용 시작");
                                 jobReturn = await ApplyDiscount(feeValue, carNumber, page, jobReturn, isGetOffWork);
                             }
+                            feeValue = await GetRealParkingFee(page);
+                        
                             page = await LogoutDiscountPage(page);
 
                         }
@@ -833,9 +828,11 @@ namespace ParkingHelp.ParkingDiscountBot
                 feeValue = feeValueAfter; // 다음 할인권 적용을 위해 현재 금액 업데이트
                 jobReturn["Result"] = "OK";
                 jobReturn["LoginAccount"] = loginAccount;
-                jobReturn["ReturnMessage"] = $"할인권 적용완료 기본 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원";
+                jobReturn["ReturnMessage"] = $"기본 할인권 적용완료 기본 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원";
                 jobReturn["Balance"] = $"{feeValueAfter}";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
+                jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.BasicTicket);
+
             }
             else if (!await discountButton.IsVisibleAsync())  //할인권 버튼을 못찾음
             {
@@ -845,6 +842,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 jobReturn["ReturnMessage"] = $"할인권 적용완료 기본 할인권 적용 후 주차금액: {feeValue} -> {feeValueAfter}원";
                 jobReturn["Balance"] = $"{feeValueAfter}";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Error);
+                jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.BasicTicket);
             }
             return jobReturn;
         }
@@ -1022,6 +1020,7 @@ namespace ParkingHelp.ParkingDiscountBot
                     jobReturn["Result"] = "OK";
                     jobReturn["ReturnMessage"] = $"차량번호: {carNum} 할인권 적용완료.";
                     jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
+                    jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.PaidTicket);
                     Logs.Info($"차량번호: {carNum} 할인권 적용완료.");
                 }
                 else
@@ -1029,16 +1028,15 @@ namespace ParkingHelp.ParkingDiscountBot
                     jobReturn["Result"] = "OK";
                     jobReturn["ReturnMessage"] = $"차량번호: {carNum} 할인권 적용을 했지만 잔액 존재";
                     jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.SuccessButFee);
+                    jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.PaidTicket);
                     Logs.Info($"차량번호: {carNum} 할인권 적용했지만 잔액이 존재함.");
                 }
             }
-
             else
             {
-                jobReturn["Result"] = "OK";
-                jobReturn["ReturnMessage"] = $"{carNum} 기본 할인권 적용완료";
+                jobReturn["Result"] = "NoChargeFee";
+                jobReturn["ReturnMessage"] = $"지불할 금액이없습니다.";
                 jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.Success);
-                Logs.Info($"차량번호: {carNum} 기본 할인권 적용완료");
             }
             return jobReturn;
         }
