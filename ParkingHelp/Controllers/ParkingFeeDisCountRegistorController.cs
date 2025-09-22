@@ -68,30 +68,10 @@ namespace ParkingHelp.Controllers
         }
 
         [HttpGet("CheckParkingFee")]
-        public async Task<IActionResult> GetDiscountParkingFee([FromQuery] int MemberId)
+        public async Task<IActionResult> GetDiscountParkingFee([FromQuery] string carNumber)
         {
-            var member = await _context.Members.Include(m => m.Cars).FirstOrDefaultAsync(m => m.Id == MemberId);
-            JObject returnJob = null;
-            if (member == null)
-            {
-                returnJob = new JObject
-                {
-                    { "Result", "Error" },
-                    { "ErrMsg", "사용자가 존재하지 않습니다" }
-                };
-                return BadRequest(returnJob.ToString());
-            }
-            MemberDto memberDto = new MemberDto
-            {
-                Id = member.Id,
-                MemberLoginId = member.MemberLoginId,
-                Cars = member.Cars.Select(c => new MemberCarDTO
-                {
-                    Id= c.Id,
-                    CarNumber = c.CarNumber,
-                }).ToList()
-            };
-            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(memberDto.Cars.First().CarNumber, string.Empty);
+           
+            ParkingDiscountModel parkingDiscountModel = new ParkingDiscountModel(carNumber, string.Empty);
 
             JObject result = await ParkingDiscountManager.EnqueueAsync(parkingDiscountModel, DiscountJobType.CheckFeeOnly);
 

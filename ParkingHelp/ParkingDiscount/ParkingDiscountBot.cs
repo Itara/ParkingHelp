@@ -675,7 +675,8 @@ namespace ParkingHelp.ParkingDiscountBot
                     {
                         return jobReturn;
                     }
-
+                    await page.WaitForSelectorAsync($"a:has-text('{carNumber}')");
+                    await page.ClickAsync($"a:has-text('{carNumber}')");
                     foreach (DiscountTicket applyDiscountTime in disCountList)
                     {
                         JObject disCountResult = new JObject();
@@ -932,8 +933,6 @@ namespace ParkingHelp.ParkingDiscountBot
                 jobReturn["DiscountType"] = EnumExtensions.GetDescription(DiscountType.PaidTicket);
                 return jobReturn;
             }
-
-
             return jobReturn;
         }
 
