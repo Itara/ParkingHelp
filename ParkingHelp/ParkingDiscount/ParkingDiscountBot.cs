@@ -631,13 +631,16 @@ namespace ParkingHelp.ParkingDiscountBot
                     {
                         try
                         {
-                            Logs.Info($"차량번호{carNumber} 기본 할인권 적용 시작");
+                            Logs.Info($"차량번호{carNumber} {parkingAccount.Id}계정으로 기본 할인권 적용 시작");
                             page = await LoginDiscountPage(parkingAccount);
 
                             await SearchCar(carNumber, page).WaitAsync(new CancellationToken());
                             //차량번호와 입차시간 추출
-                            List<string> carNoList = await ExtractCarList(page); 
-
+                            List<string> carNoList = await ExtractCarList(page);
+                            if (!IsEnteredCar(carNumber, carNoList,out jobReturn))
+                            {
+                                break;
+                            }
                             await page.WaitForSelectorAsync($"a:has-text('{carNumber}')");
                             await page.ClickAsync($"a:has-text('{carNumber}')");
 
@@ -661,7 +664,18 @@ namespace ParkingHelp.ParkingDiscountBot
                 }
                 else
                 {
+                    var parkingAccount = ParkingAccounts.FirstOrDefault(a => a.IsMain);
+                    page = await LoginDiscountPage(parkingAccount);
+
                     JArray returnJrray = new JArray();
+                    await SearchCar(carNumber, page).WaitAsync(new CancellationToken());
+                    //차량번호와 입차시간 추출
+                    List<string> carNoList = await ExtractCarList(page);
+                    if (!IsEnteredCar(carNumber, carNoList, out jobReturn))
+                    {
+                        return jobReturn;
+                    }
+
                     foreach (DiscountTicket applyDiscountTime in disCountList)
                     {
                         JObject disCountResult = new JObject();
@@ -685,30 +699,6 @@ namespace ParkingHelp.ParkingDiscountBot
                     }
                     jobReturn.Add("results", returnJrray);
                 }
-
-                //else if (carNoList.Count > 1)
-                //{
-                //    jobReturn = new JObject
-                //    {
-                //        ["Result"] = "Fail",
-                //        ["ReturnMessage"] = $"{carNumber}로 조회한 차량번호가 2개 이상입니다.",
-                //        ["CarList"] = new JObject
-                //        {
-                //            ["CarNumbers"] = new JArray(carNoList)
-                //        },
-                //        ["ResultType"] = Convert.ToInt32(DisCountResultType.CarMoreThanTwo)
-                //    };
-                //}
-                //else if (carNoList.Count < 1)
-                //{
-                //    jobReturn = new JObject
-                //    {
-                //        ["Result"] = "OK",
-                //        ["ReturnMessage"] = $"차량번호 {carNumber}는 입차 차량이 아닙니다.",
-                //        ["ResultType"] = Convert.ToInt32(DisCountResultType.NotFound)
-                //    };
-                //}
-
             }
             catch (PlaywrightException ex)
             {
@@ -759,6 +749,35 @@ namespace ParkingHelp.ParkingDiscountBot
             return carNoList;
         }
 
+
+        private static bool IsEnteredCar(string carNumber, List<string> carNoList, out JObject jobReturn)
+        {
+            bool bResult = false;
+            jobReturn = new JObject();
+            if (carNoList.Count == 0)
+            {
+                Logs.Info($"차량번호 {carNumber}는 입차 차량이 아닙니다 ");
+                jobReturn["Result"] = "NoEnterCar";
+                jobReturn["ReturnMessage"] = "차량번호 {carNumber}는 입차 차량이 아닙니다 ";
+                jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.NotFound);
+            }
+            else if (carNoList.Count > 1)
+            {
+                Logs.Info($"차량번호 {carNumber}로 조회한 차량번호가 2개 이상입니다.");
+                jobReturn["Result"] = "Fail";
+                jobReturn["ReturnMessage"] = $"차량번호 {carNumber}로 조회한 차량번호가 2개 이상입니다.";
+                jobReturn["CarList"] = new JObject
+                {
+                    ["CarNumbers"] = new JArray(carNoList)
+                };
+                jobReturn["ResultType"] = Convert.ToInt32(DisCountResultType.CarMoreThanTwo);
+            }
+            else
+            {
+                bResult =true;
+            }
+            return bResult;
+        }
 
         private static async Task<int> GetDiscountApplyAfterBalance(IPage page)
         {
