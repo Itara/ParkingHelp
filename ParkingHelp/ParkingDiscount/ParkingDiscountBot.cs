@@ -119,13 +119,14 @@ namespace ParkingHelp.ParkingDiscountBot
 #endif
 
                 _context = await _browser.NewContextAsync();  // 이걸 tempContext로 안하고 바로 _context로 설정
+                Logs.Info($" Playwright NewContextAsync!");
                 var page = await _context.NewPageAsync();
-
+                Logs.Info($" Playwright NewPageAsync!");
                 await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
                 {
                     WaitUntil = WaitUntilState.NetworkIdle
                 });
-
+                Logs.Info($" Playwright Goto http://gidc001.iptime.org:35052/nxpmsc/login");
                 await page.FillAsync("#id", "C2115");
                 await page.FillAsync("#password", "6636");
                 await page.ClickAsync("#loginBtn");
