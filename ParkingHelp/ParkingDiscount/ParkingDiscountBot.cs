@@ -122,11 +122,19 @@ namespace ParkingHelp.ParkingDiscountBot
                 Logs.Info($" Playwright NewContextAsync!");
                 var page = await _context.NewPageAsync();
                 Logs.Info($" Playwright NewPageAsync!");
-                await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
+                try
                 {
-                    WaitUntil = WaitUntilState.NetworkIdle
-                });
-                Logs.Info($" Playwright Goto http://gidc001.iptime.org:35052/nxpmsc/login");
+                    await page.GotoAsync("http://gidc001.iptime.org:35052/nxpmsc/login", new()
+                    {
+                        WaitUntil = WaitUntilState.NetworkIdle
+                    });
+                    Logs.Info($" Playwright Goto http://gidc001.iptime.org:35052/nxpmsc/login");
+                }
+                catch(Exception ex)
+                {
+                    Logs.Info($"Playwright NewPageAsync() 오류 발생 {ex.Message}");
+                }
+               
                 await page.FillAsync("#id", "C2115");
                 await page.FillAsync("#password", "6636");
                 await page.ClickAsync("#loginBtn");
