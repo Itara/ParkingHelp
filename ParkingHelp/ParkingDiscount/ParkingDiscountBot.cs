@@ -103,6 +103,7 @@ namespace ParkingHelp.ParkingDiscountBot
                 //    Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 //});
 #if DEBUG
+                Logs.Info($"Debug Playwright 실행");
                 _browser = await _playwright.Chromium.LaunchAsync(new()
                 {
                     Headless = false,
@@ -114,6 +115,7 @@ namespace ParkingHelp.ParkingDiscountBot
                     Headless = true,
                     Args = new[] { "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage" }
                 });
+                Logs.Info($"RELEASE Playwright 실행");
 #endif
 
                 _context = await _browser.NewContextAsync();  // 이걸 tempContext로 안하고 바로 _context로 설정
